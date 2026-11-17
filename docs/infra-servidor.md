@@ -75,3 +75,17 @@ Si `free -h` muestra menos de 800 MB disponibles y ya hay swap en uso, el debate
 - Copias **fuera** de la caja (`infra/scripts/backup.sh` con `BACKUP_DESTINO` remoto): un disco que se pierde se
   lleva la base y las copias si están en el mismo sitio.
 - El vídeo vive en R2, no en el disco de la caja: 40 GB se llenan con dos temporadas de PDF.
+
+## 6. Dominios
+
+| Dominio | Sirve | Certificado |
+|---|---|---|
+| `winopo.es` + `www` | landing estático (`landing/`) | Caddy / Let's Encrypt |
+| `app.winopo.es` | plataforma (Next.js) y API `/v1` | Caddy / Let's Encrypt |
+| `staging.winopo.es` | entorno de pruebas (un solo dominio) | Caddy / Let's Encrypt |
+
+Los tres apuntan a la misma máquina con registros `A`; el apex no admite `CNAME`. Caddy enruta por
+nombre de host (`infra/caddy/Caddyfile`), así que los certificados son independientes entre sí.
+
+El apex se sirve como archivos estáticos: si `core` o `web` se caen, la web comercial sigue en pie.
+Detalle del despliegue en [`../DEPLOY.md`](../DEPLOY.md).

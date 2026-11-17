@@ -19,7 +19,8 @@ services:
     environment:
       WINOPO_PROFILE: api
       APP_ENV: prod
-      DATABASE_URL: jdbc:postgresql://db:5432/winopo?user=winopo&password=${POSTGRES_PASSWORD}
+      # Rol de aplicación, NO el superusuario del contenedor: un superusuario se salta la RLS.
+      DATABASE_URL: jdbc:postgresql://db:5432/winopo?user=winopo_app&password=${POSTGRES_APP_PASSWORD:?falta POSTGRES_APP_PASSWORD}
       SESSION_SECRET: ${SESSION_SECRET:?falta SESSION_SECRET}
     depends_on: [db]
     restart: unless-stopped
@@ -30,7 +31,7 @@ services:
     environment:
       WINOPO_PROFILE: worker
       APP_ENV: prod
-      DATABASE_URL: jdbc:postgresql://db:5432/winopo?user=winopo&password=${POSTGRES_PASSWORD}
+      DATABASE_URL: jdbc:postgresql://db:5432/winopo?user=winopo_app&password=${POSTGRES_APP_PASSWORD:?falta POSTGRES_APP_PASSWORD}
       SESSION_SECRET: ${SESSION_SECRET:?falta SESSION_SECRET}
     depends_on: [db]
     restart: unless-stopped
@@ -49,9 +50,12 @@ services:
     image: caddy:2-alpine
     environment:
       WINOPO_DOMINIO: winopo.es
+      WINOPO_APP_DOMINIO: app.winopo.es
     ports: ["80:80", "443:443"]
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Landing estático: cambiarlo no requiere reconstruir nada, solo recargar Caddy.
+      - ../landing:/srv/landing:ro
       - caddy-data:/data
     depends_on: [core, web]
     restart: unless-stopped

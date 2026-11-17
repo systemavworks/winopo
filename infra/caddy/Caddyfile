@@ -1,23 +1,55 @@
-# TLS automático. Un dominio, dos destinos: web para personas, /v1 para la API.
-# El dominio viene del entorno: staging.winopo.es en staging, winopo.es en produccion.
-{$WINOPO_DOMINIO:winopo.es} {
-    encode zstd gzip
+# TLS automático. Dos sitios:
+#   winopo.es      -> landing estático (no depende del backend: si core cae, la web comercial sigue)
+#   app.winopo.es  -> plataforma Next.js y API /v1
+#
+# DOMINIO_APP cambia por entorno: app.winopo.es, staging.winopo.es...
+{$WINOPO_APP_DOMINIO:app.winopo.es} {
+	encode zstd gzip
 
-    handle /v1/* {
-        reverse_proxy core:8080
-    }
+	handle /v1/* {
+		reverse_proxy core:8080
+	}
 
-    handle /healthz {
-        reverse_proxy core:8080
-    }
+	handle /healthz {
+		reverse_proxy core:8080
+	}
 
-    handle {
-        reverse_proxy web:3000
-    }
+	handle {
+		reverse_proxy web:3000
+	}
 
-    header {
-        Strict-Transport-Security "max-age=31536000; includeSubDomains"
-        X-Content-Type-Options "nosniff"
-        Referrer-Policy "strict-origin-when-cross-origin"
-    }
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}
+
+# Apex: solo landing. Las rutas de la aplicación viven en el subdominio.
+# www entra en el mismo bloque: si el DNS lo apunta, tiene que haber certificado para él.
+{$WINOPO_DOMINIO:winopo.es}, www.{$WINOPO_DOMINIO:winopo.es} {
+	encode zstd gzip
+
+	# Quien escriba a mano winopo.es/login acaba donde tiene que acabar.
+	@aplicacion path /login /login/* /app /app/* /v1 /v1/*
+	redir @aplicacion https://{$WINOPO_APP_DOMINIO:app.winopo.es}{uri} permanent
+
+	handle /healthz {
+		reverse_proxy core:8080
+	}
+
+	handle {
+		root * /srv/landing
+		file_server
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# El landing no usa cookies ni scripts de terceros: no hay banner que mostrar.
+		Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'none'; form-action 'self'; frame-ancestors 'self'"
+	}
 }

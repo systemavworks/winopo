@@ -84,8 +84,9 @@
 <main class="wrap">
   <section>
     <h2><span class="dot"></span>Dónde estamos, sin adornos</h2>
-    <p class="lead">F0 (esqueleto, datos y acceso) está <b>escrito</b>. «Escrito» no es «verificado»: falta ejecutar la
-      batería completa y el build del frontend en esta máquina. Todo lo demás está planificado, no empezado.</p>
+    <p class="lead">F0 (esqueleto, datos y acceso) está <b>escrito y verificado en esta máquina</b>: pruebas del core,
+      typecheck y build del frontend. Lo que falta es arrancar el stack completo con PostgreSQL real y pasar el E2E.
+      Todo lo demás está planificado, no empezado.</p>
     <div class="kpi">
       <div><div class="n">20</div><div class="l">semanas de desarrollo previstas</div></div>
       <div><div class="n">7</div><div class="l">fases (F0–F5 + F2.5)</div></div>
@@ -108,9 +109,13 @@
         <tr><td><b>API core</b></td><td>Ktor: health, login, logout, quien-soy, guardas por rol y por tenant, errores en un
           formato único, logs con id de petición.</td><td><span class="badge b-warn">escrito</span></td></tr>
         <tr><td><b>Web</b></td><td>Next.js con grupos de ruta por rol, handlers de login/logout que reenvían la cookie
-          httpOnly, cliente de API tipado, cabeceras de seguridad.</td><td><span class="badge b-ok">typecheck en verde</span></td></tr>
-        <tr><td><b>Infra</b></td><td>Tres compose (local, staging, prod) con límites de memoria, Caddy con dominio
-          parametrizado, Dockerfiles multi-etapa no-root, base de datos sin puerto publicado fuera de local.</td>
+          httpOnly, cliente de API tipado, cabeceras de seguridad.</td><td><span class="badge b-ok">typecheck y build en verde</span></td></tr>
+        <tr><td><b>Landing</b></td><td><code>landing/index.html</code>: página pública de <code>winopo.es</code> sin build,
+          sin JavaScript, sin cookies ni fuentes externas (por tanto, sin banner de consentimiento). Caddy sirve el
+          apex y deja la plataforma en <code>app.winopo.es</code>.</td><td><span class="badge b-ok">HTML validado</span></td></tr>
+        <tr><td><b>Infra</b></td><td>Tres compose (local, staging, prod) con límites de memoria, Caddy con dos dominios,
+          Dockerfiles multi-etapa no-root, base de datos sin puerto publicado fuera de local. La aplicación se conecta
+          con un rol <b>sin <code>BYPASSRLS</code></b>, no con el superusuario del contenedor.</td>
           <td><span class="badge b-ok">escrito</span></td></tr>
         <tr><td><b>CI</b></td><td>Build y test del core, migraciones contra PostgreSQL 16, validación de esquemas JSON, build web.</td>
           <td><span class="badge b-warn">sin ejecutar en remoto</span></td></tr>
@@ -121,8 +126,9 @@
       </tbody>
     </table>
     <div class="note note-ok"><b>Verificado el 17-nov-2026</b>: <code>gradle test</code> ejecuta 29 pruebas en 6 clases, 0 fallos;
-      <code>tsc --noEmit</code> del web termina con código 0. <b>Falta</b> <code>next build</code> (React 19), el stack completo con
-      base de datos real y el E2E. Hasta entonces F0 sigue amarilla, no verde.</div>
+      <code>tsc --noEmit</code> termina con código 0 y <code>next build</code> compila las 7 rutas con React 19.
+      También validan los dos Caddyfiles (<code>caddy validate</code>) y el <code>docker compose config</code> de producción.
+      <b>Falta</b> el stack completo con base de datos real y el E2E: hasta entonces F0 sigue amarilla, no verde.</div>
   </section>
 
   <section>
@@ -134,7 +140,7 @@
       <tbody>
         <tr><td><b>F0</b></td><td>Esqueleto, esquema con RLS, login, dos roles, guardas, CI. Aceptación: stack desde cero y un
           opositor del tenant A recibe 404 con un recurso del tenant B.</td><td>2</td>
-          <td><span class="badge b-warn">tests y typecheck en verde · build y E2E pendientes</span></td></tr>
+          <td><span class="badge b-warn">tests, typecheck y build en verde · stack real y E2E pendientes</span></td></tr>
         <tr><td><b>F1</b></td><td>Temario versionado: editor de temas, publicación, fuentes citadas, PDF en R2, vista de opositor
           con histórico.</td><td>3</td><td><span class="badge b-todo">no empezada</span></td></tr>
         <tr><td><b>F2</b></td><td>Tests: banco de preguntas, generación por temas, temporizador, corrección contra clave fija,
@@ -298,17 +304,22 @@ git ls-files | grep -E '^\.env$|\.pem$|id_rsa' || echo 'sin secretos'</code></pr
   <section>
     <h2><span class="dot"></span>Documentación</h2>
     <div class="grid g3">
+      <div class="card"><h4>Arquitectura y operación</h4><ul>
+        <li><code>ARCHITECTURE.md</code> — componentes, multi-tenant, API</li>
+        <li><code>DEPLOY.md</code> — servidor, DNS, secretos, rollback</li>
+        <li><code>docs/infra-servidor.md</code> — dimensionado y dominios</li>
+        <li><code>infra/README.md</code> — compose y Caddy</li>
+      </ul></div>
       <div class="card"><h4>Producto</h4><ul>
         <li><code>docs/alcance-v0.md</code> — qué es y qué no</li>
         <li><code>docs/plan-implementacion.md</code> — fases y stack</li>
         <li><code>docs/decisiones.md</code> — D1–D11</li>
         <li><code>docs/marca.md</code> — nombre, voz, paleta</li>
       </ul></div>
-      <div class="card"><h4>Operación</h4><ul>
-        <li><code>docs/infra-servidor.md</code> — dimensionado</li>
+      <div class="card"><h4>Runbooks</h4><ul>
         <li><code>docs/runbooks/backup-restauracion.md</code></li>
         <li><code>docs/runbooks/job-atascado.md</code></li>
-        <li><code>infra/README.md</code> — compose y Caddy</li>
+        <li><code>landing/index.html</code> — texto comercial (sin build)</li>
       </ul></div>
       <div class="card"><h4>Legal</h4><ul>
         <li><code>docs/legal/rgpd.md</code> — bases y plazos</li>

@@ -1,9 +1,11 @@
 # Winopo · esqueleto del repositorio
 
-**Estado**: F0 escrita · 29 pruebas del core en verde, `tsc --noEmit` limpio · **Fecha**: 17-nov-2026
+**Estado**: F0 escrita · 29 pruebas del core en verde, `tsc --noEmit` y `next build` limpios · **Fecha**: 17-nov-2026
 
 Este documento dice **qué va en cada carpeta y qué no**. Si un archivo no encaja en ninguna de estas
 responsabilidades, o sobra o falta una carpeta; se decide aquí antes de escribir código.
+
+Arquitectura y despliegue no se repiten aquí: [`ARCHITECTURE.md`](../ARCHITECTURE.md) y [`DEPLOY.md`](../DEPLOY.md).
 
 ## 1. Árbol
 
@@ -21,9 +23,6 @@ winopo/
 │   │   └── guion.schema.json
 │   └── README.md
 ├── core/
-│   ├── .kotlin/
-│   │   └── sessions/
-│   │       └── … (0 archivos)
 │   ├── gradle/
 │   │   ├── wrapper/
 │   │   │   └── … (2 archivos)
@@ -60,7 +59,8 @@ winopo/
 │   └── plan-implementacion.md
 ├── infra/
 │   ├── caddy/
-│   │   └── Caddyfile
+│   │   ├── Caddyfile
+│   │   └── Caddyfile.staging
 │   ├── postgres/
 │   │   └── init.sql
 │   ├── scripts/
@@ -74,6 +74,8 @@ winopo/
 │   ├── docker-compose.staging.yml
 │   ├── docker-compose.yml
 │   └── README.md
+├── landing/
+│   └── index.html          página pública de winopo.es (HTML estático, sin JS)
 ├── migrations/
 │   ├── 0001_base.sql
 │   ├── 0002_identidad.sql
@@ -126,6 +128,8 @@ winopo/
 ├── .editorconfig
 ├── .env.example
 ├── .gitignore
+├── ARCHITECTURE.md
+├── DEPLOY.md
 ├── Makefile
 ├── README.md
 ├── winopo_logo.jpeg
@@ -143,6 +147,7 @@ winopo/
 | `core/examen` | Banco de preguntas, intentos, nota | Corrección por IA |
 | `core/supuesto` | Rúbrica, propuesta de IA, validación humana | Llamada HTTP directa al proveedor |
 | `core/pago` | Checkout, webhook idempotente, factura | Precios hardcodeados por cliente |
+| `landing/` | Texto comercial, HTML y CSS de `winopo.es` | JavaScript, analítica, cookies, datos de alumnos |
 | `web/` | Presentación, formularios, llamadas a la API | Consultas SQL, reglas de negocio |
 | `tests/e2e` | Flujos de usuario contra el stack | Tests unitarios (esos viven en `core`) |
 

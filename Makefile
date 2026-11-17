@@ -1,6 +1,6 @@
 .RECIPEPREFIX = >
 .DEFAULT_GOAL := help
-.PHONY: help dev up down logs psql migrate seed build test test-db web-dev web-build e2e tree clean
+.PHONY: help dev up down logs psql migrate seed build test test-db web-dev web-build landing e2e tree clean
 
 COMPOSE := docker compose $(if $(wildcard .env),--env-file .env,) -p winopo -f infra/docker-compose.yml
 
@@ -23,6 +23,7 @@ help:
 > @echo "  make test-db    Esquema y RLS contra el PostgreSQL del stack"
 > @echo "  make web-dev    Next.js en modo desarrollo"
 > @echo "  make web-build  Build de produccion del frontend"
+> @echo "  make landing    Sirve el landing de winopo.es en http://localhost:4000"
 > @echo "  make e2e        Pruebas de extremo a extremo (Playwright)"
 > @echo "  make tree       Arbol resumido"
 > @echo "  make clean      Borra artefactos"
@@ -72,6 +73,11 @@ web-dev:
 
 web-build:
 > cd web && npm run build
+
+# El landing es HTML estático: se sirve con cualquier servidor. En producción lo sirve Caddy.
+landing:
+> @echo "Landing en http://localhost:4000 (Ctrl+C para parar)"
+> cd landing && python3 -m http.server 4000
 
 e2e:
 > cd tests/e2e && npx playwright test

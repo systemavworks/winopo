@@ -18,7 +18,8 @@ services:
     environment:
       WINOPO_PROFILE: api
       APP_ENV: staging
-      DATABASE_URL: jdbc:postgresql://db:5432/winopo?user=winopo&password=${POSTGRES_PASSWORD}
+      # Mismo esquema que producción: rol de aplicación sin BYPASSRLS.
+      DATABASE_URL: jdbc:postgresql://db:5432/winopo?user=winopo_app&password=${POSTGRES_APP_PASSWORD:?falta POSTGRES_APP_PASSWORD}
       SESSION_SECRET: ${SESSION_SECRET:?falta SESSION_SECRET}
     depends_on: [db]
     restart: unless-stopped
@@ -29,7 +30,7 @@ services:
     environment:
       WINOPO_PROFILE: worker
       APP_ENV: staging
-      DATABASE_URL: jdbc:postgresql://db:5432/winopo?user=winopo&password=${POSTGRES_PASSWORD}
+      DATABASE_URL: jdbc:postgresql://db:5432/winopo?user=winopo_app&password=${POSTGRES_APP_PASSWORD:?falta POSTGRES_APP_PASSWORD}
       SESSION_SECRET: ${SESSION_SECRET:?falta SESSION_SECRET}
     depends_on: [db]
     restart: unless-stopped
@@ -50,7 +51,8 @@ services:
       WINOPO_DOMINIO: staging.winopo.es
     ports: ["80:80", "443:443"]
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Staging no sirve el landing: un solo dominio y un solo bloque.
+      - ./caddy/Caddyfile.staging:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
     depends_on: [core, web]
     restart: unless-stopped
