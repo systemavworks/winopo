@@ -77,7 +77,7 @@
       Un preparador publica su temario, sus tests y sus supuestos. Sus opositores estudian, practican y reciben
       correcciones que se pueden defender ante un alumno: quién corrigió, con qué rúbrica y sobre qué versión del tema.
     </div>
-    <div class="stamp">Actualizado el 17 de noviembre de 2026 · F0 en construcción · repositorio
+    <div class="stamp">Actualizado el 17 de noviembre de 2026 · F0 escrita: 29 pruebas en verde y typecheck limpio · repositorio
       <a href="https://github.com/systemavworks/winopo">systemavworks/winopo</a></div>
   </div>
 </header>
@@ -89,7 +89,7 @@
     <div class="kpi">
       <div><div class="n">20</div><div class="l">semanas de desarrollo previstas</div></div>
       <div><div class="n">7</div><div class="l">fases (F0–F5 + F2.5)</div></div>
-      <div><div class="n">6</div><div class="l">clases de test en el core</div></div>
+      <div><div class="n">29</div><div class="l">pruebas del core en verde (6 clases)</div></div>
       <div><div class="n">0</div><div class="l">secretos en el repositorio</div></div>
     </div>
     <table>
@@ -108,7 +108,7 @@
         <tr><td><b>API core</b></td><td>Ktor: health, login, logout, quien-soy, guardas por rol y por tenant, errores en un
           formato único, logs con id de petición.</td><td><span class="badge b-warn">escrito</span></td></tr>
         <tr><td><b>Web</b></td><td>Next.js con grupos de ruta por rol, handlers de login/logout que reenvían la cookie
-          httpOnly, cliente de API tipado, cabeceras de seguridad.</td><td><span class="badge b-warn">compila sin verificar</span></td></tr>
+          httpOnly, cliente de API tipado, cabeceras de seguridad.</td><td><span class="badge b-ok">typecheck en verde</span></td></tr>
         <tr><td><b>Infra</b></td><td>Tres compose (local, staging, prod) con límites de memoria, Caddy con dominio
           parametrizado, Dockerfiles multi-etapa no-root, base de datos sin puerto publicado fuera de local.</td>
           <td><span class="badge b-ok">escrito</span></td></tr>
@@ -120,8 +120,9 @@
           de job atascado, cesión de derechos y consentimiento de desistimiento.</td><td><span class="badge b-ok">escrito</span></td></tr>
       </tbody>
     </table>
-    <div class="note note-warn"><b>Lo que aún no está probado</b>: que <code>gradle test</code> ejecute de verdad las 6 clases, y
-      que <code>next build</code> termine con React 19. Hasta que esos dos comandos no salgan en verde, F0 no se declara cerrada.</div>
+    <div class="note note-ok"><b>Verificado el 17-nov-2026</b>: <code>gradle test</code> ejecuta 29 pruebas en 6 clases, 0 fallos;
+      <code>tsc --noEmit</code> del web termina con código 0. <b>Falta</b> <code>next build</code> (React 19), el stack completo con
+      base de datos real y el E2E. Hasta entonces F0 sigue amarilla, no verde.</div>
   </section>
 
   <section>
@@ -133,7 +134,7 @@
       <tbody>
         <tr><td><b>F0</b></td><td>Esqueleto, esquema con RLS, login, dos roles, guardas, CI. Aceptación: stack desde cero y un
           opositor del tenant A recibe 404 con un recurso del tenant B.</td><td>2</td>
-          <td><span class="badge b-warn">código escrito, verificación pendiente</span></td></tr>
+          <td><span class="badge b-warn">tests y typecheck en verde · build y E2E pendientes</span></td></tr>
         <tr><td><b>F1</b></td><td>Temario versionado: editor de temas, publicación, fuentes citadas, PDF en R2, vista de opositor
           con histórico.</td><td>3</td><td><span class="badge b-todo">no empezada</span></td></tr>
         <tr><td><b>F2</b></td><td>Tests: banco de preguntas, generación por temas, temporizador, corrección contra clave fija,
@@ -280,8 +281,8 @@
     <h2><span class="dot"></span>Cómo se comprueba lo que digo</h2>
     <p class="lead">Sin fe. Estos comandos, en este orden, dicen si F0 está cerrada o no.</p>
     <pre><code>cd core
-JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew test      # 6 clases, tiene que haber resultados en build/test-results
-gradle test --rerun-tasks -i | grep -c 'PASSED'                # el número, no la sensación
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew test      # 6 clases, 29 pruebas, 0 fallos
+ls build/test-results/test/*.xml | wc -l                        # 6: si sale menos, falta ejecutar algo
 
 cd ../web
 npm run typecheck && npm run build                             # React 19 + Next 15

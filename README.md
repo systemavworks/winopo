@@ -6,12 +6,13 @@ Plataforma de preparación de oposiciones: el preparador publica su temario, sus
 
 ## Estado
 
-**F0 escrita, verificación pendiente.** No hay ninguna funcionalidad de negocio todavía: temario, tests, supuestos
- y cobro están planificados, no implementados. La hoja de ruta viva está en [`winopo_roadmap.html`](winopo_roadmap.html).
+**F0 escrita y probada a medias**: 29 pruebas del core en verde y `tsc --noEmit` limpio; falta `next build`, el
+stack con PostgreSQL real y el E2E. No hay ninguna funcionalidad de negocio todavía: temario, tests, supuestos y
+cobro están planificados, no implementados. La hoja de ruta viva está en [`winopo_roadmap.html`](winopo_roadmap.html).
 
 | Fase | Contenido | Estado |
 |---|---|---|
-| F0 | Esqueleto, esquema con RLS, login, dos roles, CI | escrito, sin verificar |
+| F0 | Esqueleto, esquema con RLS, login, dos roles, CI | 29 tests verdes y typecheck limpio; falta `next build` y E2E |
 | F1 | Temario versionado | no empezada |
 | F2 | Tests con clave fija | no empezada |
 | F2.5 | Maquetación del temario (PDF reproducible) | nueva |

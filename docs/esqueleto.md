@@ -1,6 +1,6 @@
 # Winopo · esqueleto del repositorio
 
-**Estado**: F0 iniciada · **Fecha**: 17-nov-2026
+**Estado**: F0 escrita · 29 pruebas del core en verde, `tsc --noEmit` limpio · **Fecha**: 17-nov-2026
 
 Este documento dice **qué va en cada carpeta y qué no**. Si un archivo no encaja en ninguna de estas
 responsabilidades, o sobra o falta una carpeta; se decide aquí antes de escribir código.
@@ -9,60 +9,128 @@ responsabilidades, o sobra o falta una carpeta; se decide aquí antes de escribi
 
 ```
 winopo/
-├── Makefile                     comandos: dev, migrate, test, tree, web-dev
-├── README.md                    qué es y cómo se arranca
-├── .env.example                 todas las claves, ningún valor real
-├── .gitignore
-│
-├── docs/
-│   ├── alcance-v0.md            el qué: producto, módulos, legal, dominio
-│   ├── plan-implementacion.md   el cómo: stack, datos, fases, riesgos
-│   ├── plan-implementacion.html misma cosa, para leer e imprimir
-│   └── esqueleto.md             este documento
-│
-├── migrations/                  SQL a mano, numerado, nunca editado tras aplicarse
-│   ├── 0001_init.sql            tenant, app_user, membership, audit_log + RLS
-│   ├── 0002_temario.sql         (reservado F1)
-│   └── 0003_examen_supuestos.sql (reservado F2–F3)
-│
-├── contracts/                   JSON Schema: lo que el sistema no puede saltarse
-│   ├── correccion-ia.schema.json
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+├── contracts/
+│   ├── api/
+│   │   ├── error.schema.json
+│   │   └── openapi.yaml
+│   ├── ia/
+│   │   ├── correccion.schema.json
+│   │   └── guion.schema.json
 │   └── README.md
-│
-├── core/                        Kotlin + Ktor · API y worker en el mismo binario
+├── core/
+│   ├── .kotlin/
+│   │   └── sessions/
+│   │       └── … (0 archivos)
+│   ├── gradle/
+│   │   ├── wrapper/
+│   │   │   └── … (2 archivos)
+│   │   └── libs.versions.toml
+│   ├── src/
+│   │   ├── main/
+│   │   │   └── … (20 archivos)
+│   │   └── test/
+│   │       └── … (6 archivos)
 │   ├── build.gradle.kts
-│   ├── settings.gradle.kts
 │   ├── Dockerfile
-│   └── src/
-│       ├── main/kotlin/es/winopo/
-│       │   ├── Application.kt          arranque: HTTP o worker
-│       │   ├── auth/                   sesión, roles, guardas
-│       │   ├── tenant/                 contexto y RLS por petición
-│       │   ├── temario/                temas y versiones
-│       │   ├── examen/                 preguntas, tests, intentos
-│       │   ├── supuesto/               rúbricas y corrección
-│       │   ├── video/                  guion, TTS y estados del vídeo
-│       │   ├── pago/                   Stripe y webhooks
-│       │   ├── job/                    cola y worker
-│       │   └── comun/                  dinero, errores, reloj
-│       └── test/kotlin/es/winopo/      tests que corren de verdad
-│
-├── infra/docker/docker-compose.yml   PostgreSQL 16 + core + worker
-│
-├── web/                         Next.js: dos caras, una app
+│   ├── gradle.properties
+│   ├── gradlew
+│   ├── gradlew.bat
+│   └── settings.gradle.kts
+├── docs/
+│   ├── legal/
+│   │   ├── consent/
+│   │   │   └── … (1 archivos)
+│   │   ├── cesion-derechos.md
+│   │   └── rgpd.md
+│   ├── marca/
+│   │   ├── winopo_logo.jpeg
+│   │   └── winopo_logo_es.jpeg
+│   ├── runbooks/
+│   │   ├── backup-restauracion.md
+│   │   └── job-atascado.md
+│   ├── alcance-v0.md
+│   ├── decisiones.md
+│   ├── esqueleto.md
+│   ├── infra-servidor.md
+│   ├── marca.md
+│   ├── plan-implementacion.html
+│   └── plan-implementacion.md
+├── infra/
+│   ├── caddy/
+│   │   └── Caddyfile
+│   ├── postgres/
+│   │   └── init.sql
+│   ├── scripts/
+│   │   ├── backup.sh
+│   │   ├── deploy.sh
+│   │   └── restore-test.sh
+│   ├── seed/
+│   │   ├── demo-staging.sql
+│   │   └── sintetica.sql
+│   ├── docker-compose.prod.yml
+│   ├── docker-compose.staging.yml
+│   ├── docker-compose.yml
+│   └── README.md
+├── migrations/
+│   ├── 0001_base.sql
+│   ├── 0002_identidad.sql
+│   ├── 0003_audit_log.sql
+│   ├── 0004_archivo.sql
+│   ├── 0005_temario.sql
+│   ├── 0006_tema_version.sql
+│   ├── 0007_pregunta.sql
+│   ├── 0008_test.sql
+│   ├── 0009_job.sql
+│   ├── 0010_supuesto.sql
+│   ├── 0011_correccion.sql
+│   ├── 0012_video.sql
+│   ├── 0013_consent.sql
+│   ├── 0014_billing.sql
+│   └── README.md
+├── tests/
+│   └── e2e/
+│       ├── f0-acceso.spec.ts
+│       ├── f1-temario.spec.ts
+│       ├── f2-tests.spec.ts
+│       ├── f3-supuestos.spec.ts
+│       ├── f4-video.spec.ts
+│       ├── f5-pagos.spec.ts
+│       ├── package.json
+│       ├── playwright.config.ts
+│       └── README.md
+├── web/
+│   ├── public/
+│   │   ├── icons/
+│   │   │   └── … (1 archivos)
+│   │   ├── manifest.webmanifest
+│   │   └── robots.txt
+│   ├── src/
+│   │   ├── app/
+│   │   │   └── … (9 archivos)
+│   │   ├── components/
+│   │   │   └── … (4 archivos)
+│   │   └── lib/
+│   │       └── … (3 archivos)
+│   ├── .env.local.example
+│   ├── Dockerfile
+│   ├── next.config.ts
+│   ├── package-lock.json
 │   ├── package.json
-│   ├── next.config.js
+│   ├── postcss.config.mjs
 │   ├── tailwind.config.ts
-│   ├── postcss.config.js
 │   ├── tsconfig.json
-│   └── src/app/
-│       ├── layout.tsx           cabecera común con los dos accesos
-│       ├── page.tsx             portada: elegir cara
-│       ├── preparador/          shell del preparador
-│       ├── opositor/            shell del opositor
-│       └── api/                 proxy al core (sin lógica de negocio)
-│
-└── tests/e2e/                   flujos completos contra el stack levantado
+│   └── tsconfig.tsbuildinfo
+├── .editorconfig
+├── .env.example
+├── .gitignore
+├── Makefile
+├── README.md
+├── winopo_logo.jpeg
+├── winopo_logo_es.jpeg
+└── winopo_roadmap.html
 ```
 
 ## 2. Responsabilidades, con lo que NO va dentro
