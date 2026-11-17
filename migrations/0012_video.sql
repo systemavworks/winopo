@@ -1,0 +1,4 @@
+-- 0012_video · guion versionado y video (guion_sha256, estado)
+-- Fase F4 · pendiente de implementar.
+--
+-- Se crea cuando arranca la fase; el numero queda reservado para que el orden no se rompa.

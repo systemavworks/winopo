@@ -1,0 +1,4 @@
+-- 0008_test · test, test_intento y test_respuesta
+-- Fase F2 · pendiente de implementar.
+--
+-- Se crea cuando arranca la fase; el numero queda reservado para que el orden no se rompa.

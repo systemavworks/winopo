@@ -1,0 +1,61 @@
+name: winopo-staging
+
+# Datos sintéticos. Nunca alumnos reales.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: winopo
+      POSTGRES_USER: winopo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?falta POSTGRES_PASSWORD}
+    volumes:
+      - staging-db:/var/lib/postgresql/data
+    restart: unless-stopped
+    mem_limit: 512m
+
+  core:
+    build: { context: .., dockerfile: core/Dockerfile }
+    environment:
+      WINOPO_PROFILE: api
+      APP_ENV: staging
+      DATABASE_URL: jdbc:postgresql://db:5432/winopo?user=winopo&password=${POSTGRES_PASSWORD}
+      SESSION_SECRET: ${SESSION_SECRET:?falta SESSION_SECRET}
+    depends_on: [db]
+    restart: unless-stopped
+    mem_limit: 768m
+
+  worker:
+    build: { context: .., dockerfile: core/Dockerfile }
+    environment:
+      WINOPO_PROFILE: worker
+      APP_ENV: staging
+      DATABASE_URL: jdbc:postgresql://db:5432/winopo?user=winopo&password=${POSTGRES_PASSWORD}
+      SESSION_SECRET: ${SESSION_SECRET:?falta SESSION_SECRET}
+    depends_on: [db]
+    restart: unless-stopped
+    mem_limit: 768m
+
+  web:
+    build: { context: .., dockerfile: web/Dockerfile }
+    environment:
+      WINOPO_API_URL: http://core:8080
+      PORT: 3000
+    depends_on: [core]
+    restart: unless-stopped
+    mem_limit: 384m
+
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      WINOPO_DOMINIO: staging.winopo.es
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on: [core, web]
+    restart: unless-stopped
+    mem_limit: 128m
+
+volumes:
+  staging-db:
+  caddy-data:

@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Compilar
+        working-directory: core
+        run: ./gradlew build -x test
+      - name: Tests (rojo si no se ejecuta ninguno)
+        working-directory: core
+        run: ./gradlew test --rerun-tasks
+
+  base-de-datos:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: winopo
+          POSTGRES_USER: winopo
+          POSTGRES_PASSWORD: winopo
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U winopo -d winopo"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Aplicar migraciones en orden (detiene al primer error)
+        env:
+          PGPASSWORD: winopo
+        run: |
+          for f in migrations/*.sql; do
+            echo "-> $f"
+            psql -h localhost -U winopo -d winopo -v ON_ERROR_STOP=1 -f "$f"
+          done
+      - name: Semilla sintetica
+        env:
+          PGPASSWORD: winopo
+        run: psql -h localhost -U winopo -d winopo -v ON_ERROR_STOP=1 -f infra/seed/sintetica.sql
+
+  contratos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validar esquemas JSON
+        run: |
+          pip install --quiet jsonschema
+          python - <<'PY'
+          import json, glob, sys
+          from jsonschema import Draft202012Validator
+          ok = True
+          for ruta in glob.glob('contracts/**/*.schema.json', recursive=True):
+              try:
+                  Draft202012Validator.check_schema(json.load(open(ruta)))
+                  print(f'ok  {ruta}')
+              except Exception as e:
+                  ok = False
+                  print(f'FALLO {ruta}: {e}')
+          sys.exit(0 if ok else 1)
+          PY
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Instalar
+        working-directory: web
+        run: npm ci || npm install
+      - name: Build
+        working-directory: web
+        run: npm run build

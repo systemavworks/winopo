@@ -1,0 +1,4 @@
+-- 0010_supuesto · supuesto, rubrica versionada y rubrica_item
+-- Fase F3 · pendiente de implementar.
+--
+-- Se crea cuando arranca la fase; el numero queda reservado para que el orden no se rompa.

@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Winopo · Plan de implementación</title>
+<style>
+  :root { --tinta:#16202b; --gris:#5b6b7c; --linea:#dfe6ee; --acento:#0b62d6; --fondo:#f7f9fc; --caja:#eef4fb; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:2.5rem 1.25rem 5rem; background:var(--fondo); color:var(--tinta);
+         font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
+  main { max-width:60rem; margin:0 auto; }
+  header { border-bottom:3px solid var(--acento); padding-bottom:1.25rem; margin-bottom:2rem; }
+  h1 { margin:0 0 .5rem; font-size:2rem; letter-spacing:-.02em; }
+  h2 { margin:2.75rem 0 .9rem; font-size:1.35rem; padding-bottom:.4rem; border-bottom:1px solid var(--linea); }
+  h3 { margin:1.9rem 0 .6rem; font-size:1.08rem; color:var(--acento); }
+  p, li { max-width:70ch; }
+  .meta { color:var(--gris); font-size:.92rem; margin:0; }
+  table { width:100%; border-collapse:collapse; margin:1rem 0 1.5rem; font-size:.93rem; background:#fff; }
+  th, td { text-align:left; padding:.55rem .7rem; border:1px solid var(--linea); vertical-align:top; }
+  th { background:var(--caja); font-weight:600; }
+  tbody tr:nth-child(even) { background:#fbfdff; }
+  code { background:var(--caja); padding:.1rem .35rem; border-radius:4px; font-size:.9em;
+         font-family:ui-monospace,SFMono-Regular,"Cascadia Code",Consolas,monospace; }
+  pre { background:#0f1b2a; color:#e8f0f8; padding:1rem 1.1rem; border-radius:8px; overflow-x:auto;
+        font-size:.85rem; line-height:1.5; }
+  pre code { background:none; padding:0; color:inherit; }
+  blockquote { margin:1.2rem 0; padding:.75rem 1rem; border-left:4px solid var(--acento); background:#fff; color:var(--gris); }
+  .rejilla { display:grid; gap:1rem; grid-template-columns:repeat(auto-fit,minmax(15rem,1fr)); margin:1.2rem 0; }
+  .tarjeta { background:#fff; border:1px solid var(--linea); border-radius:8px; padding:.9rem 1rem; }
+  .tarjeta h4 { margin:0 0 .35rem; font-size:.95rem; }
+  .tarjeta p { margin:0; font-size:.88rem; color:var(--gris); }
+  .fase { background:#fff; border:1px solid var(--linea); border-left:4px solid var(--acento);
+          border-radius:6px; padding:.9rem 1.1rem; margin:1rem 0; }
+  .fase h3 { margin:0 0 .5rem; color:var(--tinta); font-size:1rem; }
+  .fase .sem { color:var(--gris); font-weight:400; font-size:.85rem; }
+  .acepta { margin-top:.6rem; padding-top:.6rem; border-top:1px dashed var(--linea); font-size:.9rem; }
+  .acepta b { color:var(--acento); }
+  footer { margin-top:4rem; padding-top:1rem; border-top:1px solid var(--linea); color:var(--gris); font-size:.85rem; }
+  @media print { body { background:#fff; padding:0; } .fase, table, blockquote { break-inside:avoid; } }
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>Winopo · plan de implementación</h1>
+  <p class="meta">Borrador de trabajo · 17-nov-2026 · Objetivo: plataforma operativa para 3 preparadores antes de
+  septiembre de 2027, con venta de módulos en la temporada 2027–2028.</p>
+</header>
+
+<p>Este documento decide <strong>cómo se construye</strong>. El qué está en <code>alcance-v0.md</code>: si los dos
+ discrepan, manda el alcance.</p>
+
+<h2>1. Principios</h2>
+<table>
+  <thead><tr><th>#</th><th>Principio</th><th>Consecuencia práctica</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><strong>Un backend, dos caras</strong></td><td>Un servicio y una base. Preparador y opositor son permisos y rutas, no productos</td></tr>
+    <tr><td>2</td><td><strong>El dato manda</strong></td><td>Primero el esquema y las migraciones; la pantalla después</td></tr>
+    <tr><td>3</td><td><strong>Nada se sobrescribe</strong></td><td>Temario versionado, correcciones versionadas, vídeos marcados, no borrados</td></tr>
+    <tr><td>4</td><td><strong>La IA propone</strong></td><td>Ninguna clave ni nota final sin humano. Siempre <code>corregido_por</code></td></tr>
+    <tr><td>5</td><td><strong>Multi-tenant fail-closed</strong></td><td>RLS forzado: sin contexto de tenant no se ve una fila</td></tr>
+    <tr><td>6</td><td><strong>Un test que no corre está en rojo</strong></td><td><code>make test</code> falla si no ejecuta ningún test</td></tr>
+    <tr><td>7</td><td><strong>Céntimos, nunca floats</strong></td><td>Todo importe <code>*_cents</code> entero</td></tr>
+    <tr><td>8</td><td><strong>El vídeo es un derivado</strong></td><td>Se regenera desde el guion y la versión del tema</td></tr>
+  </tbody>
+</table>
+
+<h2>2. Stack</h2>
+<p>Mismo stack que Billka, a propósito: un solo lenguaje de backend, un solo patrón de despliegue y los utillajes que
+ ya funcionan en producción.</p>
+<table>
+  <thead><tr><th>Capa</th><th>Tecnología</th><th>Motivo</th></tr></thead>
+  <tbody>
+    <tr><td>Backend</td><td><strong>Kotlin + Ktor</strong> (JDK 21, Gradle)</td><td>Coherencia con Billka; corrutinas para IA y vídeo</td></tr>
+    <tr><td>Base de datos</td><td><strong>PostgreSQL 16</strong></td><td>RLS nativo, JSONB para rúbricas, <code>citext</code> para correos</td></tr>
+    <tr><td>Migraciones</td><td><strong>SQL a mano</strong>, versionadas</td><td>El esquema es el contrato, no un subproducto del ORM</td></tr>
+    <tr><td>Frontend</td><td><strong>Next.js + TypeScript + Tailwind</strong></td><td>Dos shells sobre la misma API; SSR para el temario</td></tr>
+    <tr><td>Objetos</td><td><strong>Cloudflare R2</strong></td><td>Vídeo y PDF con coste de salida bajo</td></tr>
+    <tr><td>Colas</td><td>Tabla <code>job</code> + worker del propio <code>core</code></td><td>Sin infraestructura nueva en v0</td></tr>
+    <tr><td>IA</td><td>Proveedor externo tras una interfaz propia</td><td>Cambiar de modelo no toca el dominio</td></tr>
+    <tr><td>Vídeo</td><td>TTS + render de diapositivas</td><td>Céntimos por vídeo, regenerable</td></tr>
+    <tr><td>Pagos</td><td>Stripe (Checkout + webhooks)</td><td>IVA, facturas y SCA resueltos</td></tr>
+    <tr><td>Observabilidad</td><td>Logs estructurados + métricas de <code>job</code></td><td>Un job atascado se ve, no se adivina</td></tr>
+  </tbody>
+</table>
+<p>Nada de microservicios, ni Kubernetes, ni colas gestionadas en v0: un servicio, un worker, una base y un bucket.</p>
+
+<h2>3. Despliegue</h2>
+<pre><code>  web (Next.js)  ─┐
+                  ├─ REST /v1 ─ core (Ktor) ─┬─ PostgreSQL 16 (RLS forzado)
+  PWA opositor ───┘        │                 ├─ R2 (vídeo, PDF, adjuntos)
+                           │                 └─ proveedor IA / TTS
+                        worker (mismo binario, perfil worker)</code></pre>
+<ul>
+  <li><strong>Un servicio + un worker</strong>. El worker reclama jobs con <code>FOR UPDATE SKIP LOCKED</code>.</li>
+  <li><strong>Objetos fuera de Postgres</strong>: en la base viven metadatos, hashes y punteros.</li>
+  <li><strong>Secretos en <code>.env</code></strong>, nunca en el repositorio; <code>.env.example</code> documenta las claves.</li>
+  <li><strong>Producción y staging separados</strong>, sin datos reales en staging.</li>
+</ul>
+
+<h2>4. Modelo de datos v0</h2>
+<table>
+  <thead><tr><th>Tabla</th><th>Clave para qué</th><th>Notas</th></tr></thead>
+  <tbody>
+    <tr><td><code>tenant</code></td><td>Un preparador = un tenant</td><td><code>slug</code>, <code>nombre</code>, <code>estado</code></td></tr>
+    <tr><td><code>app_user</code></td><td>Cuenta con login</td><td>Único por correo normalizado</td></tr>
+    <tr><td><code>membership</code></td><td>Usuario en tenant, con rol</td><td><code>preparador</code>, <code>opositor</code>, <code>admin</code></td></tr>
+    <tr><td><code>temario</code></td><td>Temas de una oposición</td><td>Por tenant y convocatoria</td></tr>
+    <tr><td><code>tema</code></td><td>Unidad de estudio</td><td>Orden, título, estado</td></tr>
+    <tr><td><code>tema_version</code></td><td>Versión inmutable del contenido</td><td><code>version</code>, <code>publicado_en</code>, <code>autor_id</code></td></tr>
+    <tr><td><code>tema_fuente</code></td><td>Cita de cada versión</td><td>Norma, BOE/BOJA, URL, fecha</td></tr>
+    <tr><td><code>pregunta</code></td><td>Banco de preguntas</td><td><code>tema_id</code>, <code>enunciado</code>, <code>clave</code> fija</td></tr>
+    <tr><td><code>pregunta_opcion</code></td><td>Opciones</td><td><code>es_correcta</code></td></tr>
+    <tr><td><code>test</code></td><td>Examen generado</td><td><code>tema_ids</code>, <code>n_preguntas</code></td></tr>
+    <tr><td><code>test_intento</code></td><td>Alumno haciendo un test</td><td><code>nota_cents</code></td></tr>
+    <tr><td><code>test_respuesta</code></td><td>Respuesta por pregunta</td><td>Corregida contra clave, nunca contra IA</td></tr>
+    <tr><td><code>supuesto</code></td><td>Caso práctico</td><td><code>enunciado</code>, <code>tema_id</code></td></tr>
+    <tr><td><code>rubrica</code> / <code>rubrica_item</code></td><td>Rúbrica versionada y apartados</td><td><code>puntos_cents</code>, tolerancia</td></tr>
+    <tr><td><code>entrega</code></td><td>Supuesto entregado</td><td>Fichero o texto</td></tr>
+    <tr><td><code>correccion</code></td><td>Corrección de una entrega</td><td><strong><code>corregido_por</code></strong>, <code>modelo</code>, <code>prompt_version</code></td></tr>
+    <tr><td><code>correccion_item</code></td><td>Puntos por apartado</td><td>Trazable a <code>rubrica_item</code></td></tr>
+    <tr><td><code>video</code></td><td>Derivado del tema</td><td><code>tema_version_id</code>, <code>guion_sha256</code>, <code>estado</code></td></tr>
+    <tr><td><code>job</code></td><td>Cola de trabajo</td><td><code>tipo</code>, <code>estado</code>, <code>intentos</code></td></tr>
+    <tr><td><code>consent</code></td><td>Consentimientos y renuncia</td><td>Fecha, IP, texto versionado</td></tr>
+    <tr><td><code>audit_log</code></td><td>Quién hizo qué</td><td>Append-only</td></tr>
+  </tbody>
+</table>
+<p>Reglas transversales: toda tabla de contenido lleva <code>tenant_id</code> y RLS forzado; toda tabla con historial
+ lleva <code>creado_en</code> y <code>creado_por</code>; nada se borra, se marca.</p>
+
+<h2>5. Fases</h2>
+<p>Cada fase termina en algo <strong>demostrable</strong>, no en «código avanzado». Si el criterio de aceptación no se
+ puede enseñar en pantalla o en un test, la fase no está cerrada.</p>
+
+<div class="fase">
+  <h3>F0 · Esqueleto, datos y acceso <span class="sem">2 semanas</span></h3>
+  <p>Repositorio, <code>docker-compose</code>, <code>Makefile</code>, <code>.env.example</code>, CI. Migraciones
+  <code>0001</code>–<code>0003</code>: <code>tenant</code>, <code>app_user</code>, <code>membership</code>,
+  <code>audit_log</code>, RLS forzado. Login con sesión, dos roles, guardas por rol y por tenant.</p>
+  <p class="acepta"><b>Aceptación:</b> <code>make dev</code> levanta el stack desde cero; <code>make test</code>
+  ejecuta tests reales (y falla si no hay ninguno); un opositor del tenant A recibe 404 con un recurso del tenant B.</p>
+</div>
+
+<div class="fase">
+  <h3>F1 · Temario versionado <span class="sem">3 semanas</span></h3>
+  <p>Editor de temas y versiones; publicación; fuentes citadas por versión; subida de PDF a R2. Vista de opositor con
+  la versión publicada y el histórico.</p>
+  <p class="acepta"><b>Aceptación:</b> el preparador publica el tema 5 v1, lo edita a v2 y el opositor ve v2; v1
+  sigue consultable y el vídeo queda marcado como desactualizado.</p>
+</div>
+
+<div class="fase">
+  <h3>F2 · Tests y resultados <span class="sem">3 semanas</span></h3>
+  <p>Banco de preguntas, generación por temas y número, intento con temporizador, corrección contra clave fija.
+  Estadísticas por tema y por grupo; exportación CSV.</p>
+  <p class="acepta"><b>Aceptación:</b> test de 30 preguntas sobre 100, nota en céntimos, desglose por tema; una
+  pregunta con dos respuestas correctas <strong>no</strong> se guarda.</p>
+</div>
+
+<div class="fase">
+  <h3>F3 · Supuestos con rúbrica <span class="sem">4 semanas</span></h3>
+  <p>Enunciado, rúbrica por apartados con puntos y tolerancias, entrega de texto o fichero. Corrección asistida por
+  IA contra la rúbrica; validación humana; <code>corregido_por</code>, <code>modelo</code> y
+  <code>prompt_version</code>. Comparativa IA vs preparador.</p>
+  <p class="acepta"><b>Aceptación:</b> dos correcciones de la misma entrega, mismo prompt y modelo, dan el mismo
+  desglose; toda corrección indica quién la cerró; una entrega corregida solo por IA <strong>no</strong> suma a la
+  nota final.</p>
+</div>
+
+<div class="fase">
+  <h3>F4 · Vídeo y demo <span class="sem">3 semanas</span></h3>
+  <p>Guion desde el tema, TTS, render de diapositivas, subida a R2, reproductor con progreso. Modo demo de 3 semanas:
+  temario completo, sin vídeo y sin corrección de supuestos por IA.</p>
+  <p class="acepta"><b>Aceptación:</b> un tema pasa a vídeo sin intervención manual; regenerar no borra el anterior;
+  la demo caduca sola.</p>
+</div>
+
+<div class="fase">
+  <h3>F5 · Cobro y alta de preparadores <span class="sem">3 semanas</span></h3>
+  <p>Stripe Checkout, webhooks idempotentes, facturas, cupones de temporada. Checkout con clic de renuncia al
+  desistimiento (art. 103.m TRLGDCU) guardado con fecha, IP y versión del texto. Alta guiada de los 3 preparadores.</p>
+  <p class="acepta"><b>Aceptación:</b> compra de prueba con factura e IVA correctos; acceso concedido por webhook y
+  no por el retorno del navegador; consentimiento recuperable y auditable.</p>
+</div>
+
+<p><strong>Total: 18 semanas.</strong> Con un solo desarrollador y sin imprevistos, arrancar el 1-dic-2026 lleva a
+ principios de abril de 2027, con margen hasta septiembre.</p>
+
+<h2>6. Entornos y CI</h2>
+<table>
+  <thead><tr><th>Entorno</th><th>Para qué</th><th>Datos</th></tr></thead>
+  <tbody>
+    <tr><td>Local</td><td>Desarrollo diario</td><td>Semilla sintética</td></tr>
+    <tr><td>Staging</td><td>Demo con el preparador</td><td>Sintéticos, nunca alumnos reales</td></tr>
+    <tr><td>Producción</td><td>Alumnos</td><td>Reales, con RGPD</td></tr>
+  </tbody>
+</table>
+<p>CI en cada push: <code>make build</code>, <code>make test</code>, <code>make test-db</code> (PostgreSQL efímero
+ para esquema y RLS), validación de migraciones y <code>make web-build</code>. <strong>Rojo si no se ejecuta ningún
+ test</strong>, igual que en Billka.</p>
+
+<h2>7. Seguridad y RGPD</h2>
+<ul>
+  <li>Contraseñas con Argon2id; cookie <code>HttpOnly</code>, <code>Secure</code>, <code>SameSite=Lax</code>.</li>
+  <li>RLS forzado en todas las tablas de tenant; el contexto se fija por petición y se limpia al terminar.</li>
+  <li>Minimizar datos: correo, nombre y progreso. Nada más en v0.</li>
+  <li>Borrado: anonimizar el usuario y conservar métricas agregadas.</li>
+  <li>Portabilidad: exportación de datos del alumno en un clic.</li>
+  <li>Copias: <code>pg_dump</code> diario externo, retención 30 días, restauración probada cada trimestre.</li>
+</ul>
+
+<h2>8. IA: pipeline y versionado</h2>
+<pre><code>entrega ─► construccion_prompt(rubrica, temario_version) ─► proveedor_ia ─► correccion_item[]
+                    │                                              │
+              prompt_version                                  modelo, tokens, coste_cents</code></pre>
+<ol>
+  <li><strong>Interfaz propia</strong> <code>CorrectorIA</code> con una sola operación; cambiar de proveedor es una clase nueva.</li>
+  <li>La rúbrica entra <strong>como dato estructurado</strong>: los puntos por apartado se suman en código, no se los cree el modelo.</li>
+  <li>La respuesta se valida contra un JSON Schema; si no valida, el job falla y queda en <code>job.ultimo_error</code>.</li>
+  <li>Idempotencia por <code>entrega_id + rubrica_version + prompt_version + modelo</code>.</li>
+  <li>Coste por corrección en céntimos; un supuesto no puede costar más que el margen del módulo.</li>
+  <li><strong>Ninguna clave de test pasa por la IA</strong>, ni para generarla ni para corregirla.</li>
+</ol>
+
+<h2>9. Vídeo: pipeline</h2>
+<pre><code>tema_version ─► guion (humano o IA, revisado) ─► TTS ─► diapositivas ─► render ─► R2 ─► video(estado)</code></pre>
+<ul>
+  <li>El guion es <strong>texto versionado</strong> y propiedad del preparador; el vídeo es un derivado reproducible.</li>
+  <li><code>video.guion_sha256</code> detecta si el guion cambió sin regenerar.</li>
+  <li>Estados: <code>pendiente</code>, <code>generando</code>, <code>listo</code>, <code>fallido</code>, <code>desactualizado</code>.</li>
+  <li>Un fallo de render no bloquea el tema: se publica el texto y el vídeo va cuando va.</li>
+</ul>
+
+<h2>10. Pagos</h2>
+<ul>
+  <li>Stripe Checkout con <code>client_reference_id</code> = <code>membership_id</code>; el acceso se concede
+  <strong>por webhook</strong>, nunca por el retorno del navegador.</li>
+  <li>Webhooks idempotentes por <code>event.id</code> en tabla propia.</li>
+  <li>Factura con IVA español; si el asesor confirma exención de enseñanza, se configura y se documenta.</li>
+  <li>Renuncia al desistimiento: casilla obligatoria, texto versionado, fecha e IP.</li>
+  <li>Reembolsos manuales en v0, con registro en <code>audit_log</code>.</li>
+</ul>
+
+<h2>11. Costes de operación</h2>
+<table>
+  <thead><tr><th>Concepto</th><th>Coste mensual estimado</th></tr></thead>
+  <tbody>
+    <tr><td>Servidor (core + worker)</td><td>15–40 €</td></tr>
+    <tr><td>PostgreSQL gestionado</td><td>15–30 €</td></tr>
+    <tr><td>R2 (20 GB de vídeo)</td><td>2–5 €</td></tr>
+    <tr><td>Correo transaccional</td><td>0–15 €</td></tr>
+    <tr><td>IA (500 correcciones/mes)</td><td>20–60 €</td></tr>
+    <tr><td>TTS y render (20 vídeos/mes)</td><td>10–30 €</td></tr>
+    <tr><th>Total</th><th>~60–180 €/mes</th></tr>
+  </tbody>
+</table>
+<p>Se sostiene con tres preparadores y pocos alumnos: el punto de equilibrio no exige cientos de clientes.</p>
+
+<h2>12. Riesgos</h2>
+<table>
+  <thead><tr><th>Riesgo</th><th>Impacto</th><th>Mitigación</th></tr></thead>
+  <tbody>
+    <tr><td>El preparador no cede los derechos de sus apuntes</td><td>Alto</td><td>Cláusula de cesión firmada <strong>antes</strong> de subir nada</td></tr>
+    <tr><td>Se aloja material de editorial</td><td>Alto</td><td>Solo enlaces; revisión manual del material subido</td></tr>
+    <tr><td>La IA corrige mal y el alumno reclama</td><td>Alto</td><td>Rúbrica explícita, validación humana, <code>corregido_por</code></td></tr>
+    <tr><td>Confusión con <code>opositio</code> al dictar el dominio</td><td>Medio</td><td>Comprar <code>vinopo.es</code>; logotipo siempre con la W visible</td></tr>
+    <tr><td>OEPM deniega o hay anterioridad en clase 41</td><td>Medio</td><td>Búsqueda antes de invertir en marca; alternativa de nombre barata</td></tr>
+    <tr><td>Coste de IA descontrolado</td><td>Medio</td><td>Límite por alumno y mes; coste por corrección en céntimos</td></tr>
+    <tr><td>Dependencia de un solo desarrollador</td><td>Alto</td><td>Documentación, migraciones a mano, tests que corren solos</td></tr>
+  </tbody>
+</table>
+
+<h2>13. Definición de «hecho»</h2>
+<p>Una historia está hecha cuando: hay migración, hay test que la cubre, hay pantalla o endpoint demostrable, está
+ protegida por rol y por tenant, y está en el documento de alcance si cambió una regla de negocio.</p>
+
+<h2>14. Próximos pasos</h2>
+<ol>
+  <li>Crear el esqueleto del repositorio y que <code>make dev</code> levante un «hola mundo» con dos roles.</li>
+  <li>Cerrar D9 (precio del preparador) y D7 (responsable del tratamiento).</li>
+  <li>Búsqueda OEPM clase 41 y compra de <code>vinopo.es</code>.</li>
+  <li>Firma de cesión de derechos con el primer preparador.</li>
+  <li>Semilla con un temario real de 5 temas y 100 preguntas para probar F1–F2.</li>
+</ol>
+
+<h2>15. Árbol del repositorio</h2>
+<pre><code>winopo/
+├── Makefile
+├── README.md
+├── .env.example
+├── .gitignore
+├── core/                        # Kotlin + Ktor
+├── migrations/                  # SQL versionado, RLS incluido
+├── contracts/                   # JSON Schema de la API y de la IA
+├── infra/                       # docker-compose y despliegue
+├── web/                         # Next.js: preparador + opositor
+├── docs/                        # este plan y el alcance
+└── tests/                       # pruebas de extremo a extremo</code></pre>
+<p>El detalle de cada carpeta está en <code>esqueleto.md</code>.</p>
+
+<footer>Winopo · plan de implementación · 17-nov-2026 · documento vivo: si cambia una decisión, se cambia aquí y en
+ <code>alcance-v0.md</code>, nunca solo en el código.</footer>
+</main>
+</body>
+</html>

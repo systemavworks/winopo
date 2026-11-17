@@ -1,0 +1,4 @@
+-- 0014_billing · modulo, compra, factura, cupon y stripe_event
+-- Fase F5 · pendiente de implementar.
+--
+-- Se crea cuando arranca la fase; el numero queda reservado para que el orden no se rompa.

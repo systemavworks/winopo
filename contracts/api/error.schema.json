@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://winopo.es/contracts/api/error.schema.json",
+  "title": "Error de API",
+  "description": "Forma única de error. El 404 cross-tenant es indistinguible de un 404 real: no filtra existencia.",
+  "type": "object",
+  "required": ["error"],
+  "additionalProperties": false,
+  "properties": {
+    "error": { "type": "string", "minLength": 3, "maxLength": 200 },
+    "codigo": { "type": "string", "pattern": "^[a-z0-9_]{3,40}$" },
+    "request_id": { "type": "string", "minLength": 8 }
+  }
+}

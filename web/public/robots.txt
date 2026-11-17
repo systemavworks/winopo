@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /preparador
+Disallow: /opositor
+Disallow: /admin
+Disallow: /api

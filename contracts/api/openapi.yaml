@@ -1,0 +1,80 @@
+openapi: 3.0.3
+info:
+  title: Winopo API
+  version: 0.1.0
+  description: |
+    REST /v1. Dos caras (preparador y opositor) sobre el mismo backend.
+    Reglas: el tenant sale de la sesión, nunca del cuerpo; el 404 cross-tenant es idéntico a un 404 real.
+servers:
+  - url: https://winopo.es/v1
+    description: producción
+  - url: http://localhost:8080/v1
+    description: local
+paths:
+  /healthz:
+    get:
+      summary: Estado del servicio
+      responses:
+        '200':
+          description: Servicio vivo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  estado: { type: string, example: ok }
+                  servicio: { type: string, example: winopo }
+  /auth/login:
+    post:
+      summary: Inicia sesión y fija el tenant en la sesión
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [correo, clave]
+              properties:
+                correo: { type: string, format: email }
+                clave: { type: string, minLength: 12 }
+      responses:
+        '200':
+          description: Sesión creada (cookie HttpOnly)
+        '401':
+          description: Credenciales incorrectas
+          content:
+            application/json:
+              schema: { $ref: './error.schema.json' }
+  /auth/sesion:
+    get:
+      summary: Usuario y tenant de la sesión actual
+      responses:
+        '200':
+          description: Sesión válida
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  usuario_id: { type: string, format: uuid }
+                  tenant_id: { type: string, format: uuid }
+                  rol: { type: string, enum: [preparador, opositor, admin] }
+        '401':
+          description: Sin sesión
+          content:
+            application/json:
+              schema: { $ref: './error.schema.json' }
+  /auth/logout:
+    post:
+      summary: Cierra la sesión
+      responses:
+        '204':
+          description: Sesión cerrada
+components:
+  securitySchemes:
+    cookieSesion:
+      type: apiKey
+      in: cookie
+      name: winopo_sesion
+security:
+  - cookieSesion: []

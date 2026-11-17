@@ -1,0 +1,30 @@
+# Entorno
+.env
+.env.local
+*.log
+
+# Java / Gradle
+.gradle/
+build/
+*.class
+
+# Node / Next
+node_modules/
+.next/
+out/
+tsconfig.tsbuildinfo
+
+# Python (scripts sueltos)
+.venv/
+__pycache__/
+
+# Sistema
+.DS_Store
+*.swp
+
+# Datos locales
+backups/
+*.dump
+
+# Inventario e infra identificable: fuera del repo publico
+privado/

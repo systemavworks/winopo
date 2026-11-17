@@ -1,0 +1,4 @@
+-- 0009_job · cola job (tipo, estado, intentos, ultimo_error)
+-- Fase F3 · pendiente de implementar.
+--
+-- Se crea cuando arranca la fase; el numero queda reservado para que el orden no se rompa.

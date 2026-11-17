@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://winopo.es/contracts/ia/guion.schema.json",
+  "title": "Guion de vídeo",
+  "description": "Guion por diapositivas. Siempre revisado por el preparador antes de pasar a TTS.",
+  "type": "object",
+  "required": ["diapositivas"],
+  "additionalProperties": false,
+  "properties": {
+    "diapositivas": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 60,
+      "items": {
+        "type": "object",
+        "required": ["titulo", "locucion"],
+        "additionalProperties": false,
+        "properties": {
+          "titulo": { "type": "string", "minLength": 3, "maxLength": 120 },
+          "locucion": { "type": "string", "minLength": 20, "maxLength": 1200 },
+          "vinetas": { "type": "array", "maxItems": 6, "items": { "type": "string", "maxLength": 200 } }
+        }
+      }
+    }
+  }
+}

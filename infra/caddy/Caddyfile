@@ -1,0 +1,23 @@
+# TLS automático. Un dominio, dos destinos: web para personas, /v1 para la API.
+# El dominio viene del entorno: staging.winopo.es en staging, winopo.es en produccion.
+{$WINOPO_DOMINIO:winopo.es} {
+    encode zstd gzip
+
+    handle /v1/* {
+        reverse_proxy core:8080
+    }
+
+    handle /healthz {
+        reverse_proxy core:8080
+    }
+
+    handle {
+        reverse_proxy web:3000
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+}

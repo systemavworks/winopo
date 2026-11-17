@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Winopo — Hoja de ruta · preparación de oposiciones con temario versionado y rúbrica explícita</title>
+<style>
+  :root{
+    --bg:#f7f9fc; --panel:#ffffff; --panel2:#eef2f8; --ink:#16202b; --muted:#5f6b7a;
+    --line:#e0e6ef; --brand:#0b62d6; --brand2:#094aa2; --ok:#1c7c54; --warn:#9a6b06;
+    --todo:#b3341f; --info:#0b62d6; --violet:#5b46b8;
+    --radius:16px; --shadow:0 1px 2px rgba(16,32,56,.05),0 10px 30px rgba(16,32,56,.07);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);line-height:1.6;
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif}
+  a{color:var(--info);text-decoration:none} a:hover{text-decoration:underline}
+  .wrap{max-width:1140px;margin:0 auto;padding:0 26px}
+  header{padding:54px 0 34px;background:linear-gradient(180deg,#ffffff,#f7f9fc);border-bottom:1px solid var(--line)}
+  h1{margin:0;font-size:38px;letter-spacing:-.7px;font-weight:660}
+  h1 .k{color:var(--brand)}
+  .sub{color:var(--muted);margin-top:8px;font-size:15px}
+  .tagline{margin-top:20px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--brand);
+    padding:14px 18px;border-radius:12px;box-shadow:var(--shadow);font-size:16px;max-width:900px}
+  .stamp{margin-top:16px;color:var(--muted);font-size:13px}
+  main{padding:8px 0 70px}
+  section{padding:32px 0;border-bottom:1px solid var(--line)}
+  section:last-child{border-bottom:none}
+  h2{font-size:22px;margin:0 0 6px;font-weight:650;display:flex;align-items:center;gap:11px;letter-spacing:-.2px}
+  h2 .dot{width:9px;height:9px;border-radius:50%;background:var(--brand);flex:0 0 auto}
+  h3{font-size:16px;margin:22px 0 8px;font-weight:650}
+  h4{font-size:15px;margin:0 0 8px;font-weight:650}
+  p.lead{color:var(--muted);margin:0 0 18px;font-size:15px;max-width:880px}
+  .grid{display:grid;gap:16px}
+  .g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(4,1fr)}
+  @media(max-width:900px){.g2,.g3,.g4{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+  .card p{margin:0;color:var(--muted);font-size:14px}
+  .card ul{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:14px}
+  .card li{margin:4px 0}
+  .card.hi{border-left:3px solid var(--brand)}
+  .card.new{border-left:3px solid var(--violet)}
+  table{width:100%;border-collapse:separate;border-spacing:0;font-size:14px;background:var(--panel);
+    border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:var(--panel2);color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+  tr:last-child td{border-bottom:none}
+  .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+  .b-ok{background:#e8f5ee;color:var(--ok);border:1px solid #cbe8d8}
+  .b-warn{background:#fbf3e2;color:var(--warn);border:1px solid #efe0bd}
+  .b-todo{background:#fbeceb;color:var(--todo);border:1px solid #f0d4d1}
+  .b-info{background:#e9f1fd;color:var(--info);border:1px solid #cfe0f9}
+  .b-violet{background:#f0ecfb;color:var(--violet);border:1px solid #ddd3f4}
+  .chip{background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:5px 13px;font-size:13px}
+  .chip b{color:var(--brand)}
+  .stack{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  code{background:#eef2f8;border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:13px;color:#2c3a4b}
+  pre{background:#eef2f8;border:1px solid var(--line);border-radius:12px;padding:14px 16px;overflow-x:auto;font-size:13px;margin:10px 0}
+  pre code{background:none;border:none;padding:0}
+  .kpi{display:flex;gap:36px;flex-wrap:wrap;margin:10px 0}
+  .kpi .n{font-size:30px;font-weight:680;letter-spacing:-.6px}
+  .kpi .l{color:var(--muted);font-size:13px}
+  .note{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--violet);
+    border-radius:12px;padding:14px 18px;box-shadow:var(--shadow);font-size:14px;margin:14px 0}
+  .note b{color:var(--violet)}
+  .note-warn{border-left-color:var(--todo)} .note-warn b{color:var(--todo)}
+  .note-ok{border-left-color:var(--ok)} .note-ok b{color:var(--ok)}
+  footer{padding:30px 0 50px;color:var(--muted);font-size:13px;text-align:center}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <h1>Wino<span class="k">po</span></h1>
+    <div class="sub">Hoja de ruta · preparación de oposiciones · temario versionado, tests con clave fija y corrección con rúbrica</div>
+    <div class="tagline">
+      Un preparador publica su temario, sus tests y sus supuestos. Sus opositores estudian, practican y reciben
+      correcciones que se pueden defender ante un alumno: quién corrigió, con qué rúbrica y sobre qué versión del tema.
+    </div>
+    <div class="stamp">Actualizado el 17 de noviembre de 2026 · F0 en construcción · repositorio
+      <a href="https://github.com/systemavworks/winopo">systemavworks/winopo</a></div>
+  </div>
+</header>
+<main class="wrap">
+  <section>
+    <h2><span class="dot"></span>Dónde estamos, sin adornos</h2>
+    <p class="lead">F0 (esqueleto, datos y acceso) está <b>escrito</b>. «Escrito» no es «verificado»: falta ejecutar la
+      batería completa y el build del frontend en esta máquina. Todo lo demás está planificado, no empezado.</p>
+    <div class="kpi">
+      <div><div class="n">20</div><div class="l">semanas de desarrollo previstas</div></div>
+      <div><div class="n">7</div><div class="l">fases (F0–F5 + F2.5)</div></div>
+      <div><div class="n">6</div><div class="l">clases de test en el core</div></div>
+      <div><div class="n">0</div><div class="l">secretos en el repositorio</div></div>
+    </div>
+    <table>
+      <thead><tr><th>Área</th><th>Qué hay de verdad</th><th>Estado</th></tr></thead>
+      <tbody>
+        <tr><td><b>Esquema y RLS</b></td><td>Migraciones SQL: <code>tenant</code>, <code>app_user</code>, <code>membership</code>,
+          <code>sesion</code>, <code>audit_log</code>; RLS forzado y dos políticas de arranque (la del propio membership y la del
+          token de sesión) para poder iniciar sesión antes de saber el tenant.</td>
+          <td><span class="badge b-warn">escrito</span></td></tr>
+        <tr><td><b>Conexión a base</b></td><td>Hikari + <code>set_config(..., true)</code> por transacción:
+          <code>conSesion</code>, <code>conUsuario</code>, <code>conTenant</code>, <code>sinContexto</code>. Sin contexto no se ve una fila.</td>
+          <td><span class="badge b-ok">con test</span></td></tr>
+        <tr><td><b>Acceso</b></td><td>PBKDF2 con sal por usuario, sesión con token opaco (solo se guarda el hash), rol
+          recalculado en cada petición desde <code>membership</code> → revocar es inmediato.</td>
+          <td><span class="badge b-ok">con test</span></td></tr>
+        <tr><td><b>API core</b></td><td>Ktor: health, login, logout, quien-soy, guardas por rol y por tenant, errores en un
+          formato único, logs con id de petición.</td><td><span class="badge b-warn">escrito</span></td></tr>
+        <tr><td><b>Web</b></td><td>Next.js con grupos de ruta por rol, handlers de login/logout que reenvían la cookie
+          httpOnly, cliente de API tipado, cabeceras de seguridad.</td><td><span class="badge b-warn">compila sin verificar</span></td></tr>
+        <tr><td><b>Infra</b></td><td>Tres compose (local, staging, prod) con límites de memoria, Caddy con dominio
+          parametrizado, Dockerfiles multi-etapa no-root, base de datos sin puerto publicado fuera de local.</td>
+          <td><span class="badge b-ok">escrito</span></td></tr>
+        <tr><td><b>CI</b></td><td>Build y test del core, migraciones contra PostgreSQL 16, validación de esquemas JSON, build web.</td>
+          <td><span class="badge b-warn">sin ejecutar en remoto</span></td></tr>
+        <tr><td><b>E2E</b></td><td>Playwright configurado, F0 con 5 pruebas reales; F1–F5 marcadas como pendientes explícitas
+          (<code>test.fixme</code>), no como verdes falsos.</td><td><span class="badge b-info">esqueleto</span></td></tr>
+        <tr><td><b>Documentación</b></td><td>Alcance, plan, decisiones, marca, RGPD, infraestructura, runbooks de backup y
+          de job atascado, cesión de derechos y consentimiento de desistimiento.</td><td><span class="badge b-ok">escrito</span></td></tr>
+      </tbody>
+    </table>
+    <div class="note note-warn"><b>Lo que aún no está probado</b>: que <code>gradle test</code> ejecute de verdad las 6 clases, y
+      que <code>next build</code> termine con React 19. Hasta que esos dos comandos no salgan en verde, F0 no se declara cerrada.</div>
+  </section>
+
+  <section>
+    <h2><span class="dot"></span>Las fases</h2>
+    <p class="lead">Cada fase termina en algo demostrable en pantalla o en un test. Si no se puede enseñar, la fase no está
+      cerrada.</p>
+    <table>
+      <thead><tr><th style="width:74px">Fase</th><th>Qué entrega</th><th style="width:96px">Semanas</th><th style="width:150px">Estado</th></tr></thead>
+      <tbody>
+        <tr><td><b>F0</b></td><td>Esqueleto, esquema con RLS, login, dos roles, guardas, CI. Aceptación: stack desde cero y un
+          opositor del tenant A recibe 404 con un recurso del tenant B.</td><td>2</td>
+          <td><span class="badge b-warn">código escrito, verificación pendiente</span></td></tr>
+        <tr><td><b>F1</b></td><td>Temario versionado: editor de temas, publicación, fuentes citadas, PDF en R2, vista de opositor
+          con histórico.</td><td>3</td><td><span class="badge b-todo">no empezada</span></td></tr>
+        <tr><td><b>F2</b></td><td>Tests: banco de preguntas, generación por temas, temporizador, corrección contra clave fija,
+          estadísticas por tema y grupo.</td><td>3</td><td><span class="badge b-todo">no empezada</span></td></tr>
+        <tr><td><b>F2.5</b></td><td><b>Maquetación del temario</b>: importar DOCX/PDF, plantilla única, PDF con índice paginado y avisos de
+          calidad. <a href="#maquetacion">Detalle</a>.</td><td>2</td><td><span class="badge b-violet">nueva</span></td></tr>
+        <tr><td><b>F3</b></td><td>Supuestos con rúbrica por apartados, corrección IA, validación humana y comparativa IA vs preparador.</td>
+          <td>4</td><td><span class="badge b-todo">no empezada</span></td></tr>
+        <tr><td><b>F4</b></td><td>Vídeo (voz sintética + diapositivas), atado a la versión del tema, y demo de 3 semanas que caduca sola.</td>
+          <td>3</td><td><span class="badge b-todo">no empezada</span></td></tr>
+        <tr><td><b>F5</b></td><td>Cobro con Stripe, webhooks idempotentes, facturas, consentimiento de renuncia al desistimiento, alta de los
+          3 primeros preparadores.</td><td>3</td><td><span class="badge b-todo">no empezada</span></td></tr>
+      </tbody>
+    </table>
+    <p class="lead" style="margin-top:14px">Con un solo desarrollador y sin imprevistos, arrancar el 1-dic-2026 lleva a finales de
+      abril de 2027. Septiembre de 2027 queda como margen, no como fecha de entrega.</p>
+  </section>
+  <section id="maquetacion">
+    <h2><span class="dot" style="background:#5b46b8"></span>F2.5 · Maquetación: el trabajo que nadie quiere hacer</h2>
+    <p class="lead">Observación de campo (17-nov-2026, de una profesora en activo): <b>muchos preparadores y opositores
+      tienen el temario pendiente de maquetar</b>. El contenido existe en Word, en escaneos o en fotos. Lo que no existe es
+      un documento estudiable: portada, índice paginado, epígrafes numerados, tablas que no se salgan de la página.</p>
+    <div class="grid g3">
+      <div class="card new"><h4>El problema, en concreto</h4><ul>
+        <li>Word con estilos inconsistentes entre temas, y a veces dentro del mismo tema.</li>
+        <li>Escaneos y fotos: no se pueden buscar, ni copiar, ni adaptar a lectura en móvil.</li>
+        <li>PDF de 900 páginas sin índice útil ni numeración: el opositor no sabe dónde está.</li>
+        <li>Preparadores que pagan la maquetación aparte (40–90 € por tema) o la hacen a mano de noche.</li>
+      </ul></div>
+      <div class="card new"><h4>Qué hace Winopo</h4><ul>
+        <li>Importa DOCX, Markdown o PDF con texto y lo normaliza a un Markdown propio.</li>
+        <li>Aplica una plantilla por tenant: A4, tipografía, encabezado con tema y versión, pie «página x de y».</li>
+        <li>Genera índice paginado y numera epígrafes de forma automática.</li>
+        <li>Devuelve <b>avisos</b>: imágenes por debajo de 150 ppp, tablas que desbordan, epígrafes sin numerar, enlaces muertos.</li>
+      </ul></div>
+      <div class="card new"><h4>Qué no hace, a propósito</h4><ul>
+        <li>No es un editor WYSIWYG: un editor es otro producto y otro año de trabajo.</li>
+        <li>No inventa contenido: si el epígrafe no está en el texto, no aparece en el PDF.</li>
+        <li>No permite editar el PDF a mano: se regenera desde la versión del tema.</li>
+        <li>No promete diseño libre por preparador en v1.</li>
+      </ul></div>
+    </div>
+    <h3>Pipeline</h3>
+    <pre><code>DOCX / MD / PDF con texto
+        │
+        ├─ normalizar ──▶ winopo-md (títulos, listas, tablas, imágenes, citas)
+        │
+        ├─ validar ────▶ avisos de calidad (ppp, desbordes, numeración, enlaces)
+        │
+        └─ maquetar ───▶ HTML + CSS de plantilla ──▶ WeasyPrint ──▶ PDF
+                                                            │
+                                              tema_version + hash_plantilla
+                                              (derivado, reproducible)</code></pre>
+    <p class="lead">WeasyPrint (HTML+CSS → PDF) y no LaTeX: menos dependencias, funciona en ARM64 sin dolores y usa el mismo
+      lenguaje de estilos que la web. El maquetador vive en un contenedor aparte para no arrastrar Python al core.</p>
+    <h3>Por qué es una fase y no un extra</h3>
+    <div class="grid g2">
+      <div class="card"><h4>Comercial</h4><p>Hoy se cobra aparte o se hace a mano. Incluirlo en el módulo Base es un
+        argumento concreto frente a Opogestión y compañía, y crea dependencia sana: nadie migra un temario ya maquetado.</p></div>
+      <div class="card"><h4>Técnico</h4><p>El PDF maquetado es el derivado que ya necesita F1 y F4. Si se improvisa en F4,
+        se rehace. Hacerlo antes de los tests evita duplicar la plantilla en dos sitios.</p></div>
+    </div>
+    <div class="note"><b>Aceptación</b>: un DOCX de 40 páginas produce en menos de 2 minutos un PDF con portada, índice
+      paginado y numeración correcta; y el listado de avisos detecta las 3 tablas desbordadas de un fichero de prueba.</div>
+    <div class="note note-warn"><b>Riesgo honesto</b>: la maquetación perfecta es un pozo sin fondo. El límite está en la
+      plantilla única y en los avisos: se dice qué está mal, no se arregla por arte de magia. Lo que requiera criterio
+      editorial (figuras, tablas complejas) sigue siendo trabajo humano, y eso se puede vender como servicio.</div>
+  </section>
+  <section>
+    <h2><span class="dot"></span>Decisiones que ya están tomadas</h2>
+    <p class="lead">Detalle completo en <code>docs/decisiones.md</code>. Si algo de aquí se cambia, se cambia también allí, en el
+      mismo commit. Una decisión que solo vive en la cabeza no existe.</p>
+    <table>
+      <thead><tr><th style="width:64px">#</th><th>Decisión</th><th>Motivo en una línea</th><th style="width:110px">Estado</th></tr></thead>
+      <tbody>
+        <tr><td><b>D1</b></td><td>Un opositor, un preparador</td><td>Dos dueños del mismo historial es un dolor de cabeza legal y de producto; cambiar de preparador es una migración explícita.</td><td><span class="badge b-ok">firme</span></td></tr>
+        <tr><td><b>D2</b></td><td>RLS forzada, no opcional</td><td>Si el aislamiento depende de que el código se acuerde de filtrar,
+        algún día no se acordará.</td><td><span class="badge b-ok">firme</span></td></tr>
+        <tr><td><b>D3</b></td><td>El rol <code>winopo_app</code> se crea fuera de las migraciones</td><td>Un rol con contraseña no
+        pertenece al repositorio; lo crea el operador y la migración solo asume que existe.</td><td><span class="badge b-ok">firme</span></td></tr>
+        <tr><td><b>D4</b></td><td>La sesión guarda el hash del token, no el token</td><td>Quien lea la tabla no puede suplantar a nadie.</td>
+        <td><span class="badge b-ok">firme</span></td></tr>
+        <tr><td><b>D5</b></td><td>Dos políticas de arranque en <code>membership</code> y <code>sesion</code></td><td>El login ocurre antes
+        de conocer el tenant; sin estas dos políticas, la RLS forzada impide entrar.</td><td><span class="badge b-ok">firme</span></td></tr>
+        <tr><td><b>D6</b></td><td><code>winopo.es</code> como dominio</td><td>Corto, pronunciable en español y coherente con la
+        marca.</td><td><span class="badge b-warn">confirmar DNS</span></td></tr>
+        <tr><td><b>D7</b></td><td>Responsable del tratamiento</td><td>Define quién figura en la política de privacidad y
+        dónde se firma el encargo de tratamiento.</td><td><span class="badge b-todo">pendiente</span></td></tr>
+        <tr><td><b>D8</b></td><td>Auditoría append-only por trigger</td><td>Un log que la aplicación puede editar no sirve para defender
+        una nota.</td><td><span class="badge b-ok">firme</span></td></tr>
+        <tr><td><b>D9</b></td><td>Precio del preparador por opositor</td><td>El software no puede pasar del 10 % de lo que el
+        preparador factura por alumno.</td><td><span class="badge b-todo">falta dato real</span></td></tr>
+        <tr><td><b>D10</b></td><td>PBKDF2 (JDK) en vez de Argon2id</td><td>El servidor es ARM64: un artefacto nativo menos es un
+        despliegue menos que se rompe. Se revisa si se migra a x86.</td><td><span class="badge b-ok">firme</span></td></tr>
+        <tr><td><b>D11</b></td><td>Maquetación con WeasyPrint en contenedor aparte</td><td>HTML+CSS ya es el lenguaje de la plantilla; LaTeX
+        en ARM64 es una dependencia enorme para el mismo resultado.</td><td><span class="badge b-violet">nueva</span></td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2><span class="dot"></span>Pendientes que no son código</h2>
+    <p class="lead">Estos frenan el lanzamiento igual que un bug, pero no se arreglan con un commit.</p>
+    <div class="grid g2">
+      <div class="card"><h4>Antes de cerrar F0</h4><ul>
+        <li><b>D7</b> — decidir el responsable del tratamiento y redactar la política definitiva.</li>
+        <li>DNS de <code>winopo.es</code> apuntando al servidor.</li>
+        <li>Comprar <code>vinopo.es</code> como defensa ante el error de tecleo.</li>
+        <li>Registrar el repositorio como <b>privado</b> hasta que haya contrato de cesión firmado.</li>
+      </ul></div>
+      <div class="card"><h4>Antes de cobrar (F5)</h4><ul>
+        <li><b>D9</b> — precio real del preparador por opositor, con al menos un preparador dispuesto a firmarlo.</li>
+        <li>Búsqueda en OEPM y EUIPO, clase 41 (formación), sin conflictos.</li>
+        <li>Texto de renuncia al desistimiento revisado (art. 103.m TRLGDCU).</li>
+        <li>Contrato de cesión de derechos revisado por abogado.</li>
+        <li>Decidir si el servidor actual (CAX11, ya con otros dos productos) aguanta o se contrata un CAX21 aparte.</li>
+      </ul></div>
+    </div>
+    <div class="note note-warn"><b>Repositorio público</b>: el 17-nov-2026 se publicó <code>systemavworks/winopo</code>. Antes de
+      subir nada se sacaron del repositorio el ID, el hostname y las IP del servidor, que ahora viven en <code>privado/</code>
+      (ignorado por git). Un repositorio público que anuncia la IP de producción ahorra la mitad del trabajo a quien busque
+      problemas.</div>
+  </section>
+  <section>
+    <h2><span class="dot"></span>Riesgos, dichos en voz alta</h2>
+    <table>
+      <thead><tr><th>Riesgo</th><th>Qué lo dispara</th><th>Cómo se contiene</th></tr></thead>
+      <tbody>
+        <tr><td>El preparador no sube temario maquetado ni sin maquetar</td><td>Falta de tiempo, no de ganas</td>
+          <td>Importador y avisos en F2.5; migración asistida de su primer tema como parte del alta</td></tr>
+        <tr><td>La IA corrige mal y el alumno lo nota</td><td>Rúbrica vaga o modelo cambiado sin versión</td>
+          <td><code>corregido_por</code>, <code>modelo</code> y <code>prompt_version</code> en cada corrección; la IA nunca cierra la nota</td></tr>
+        <tr><td>Un job se atasca y nadie se entera</td><td>Worker caído o proveedor externo lento</td>
+          <td>Runbook de job atascado y métricas de cola desde F0</td></tr>
+        <tr><td>Coste de infraestructura por producto</td><td>Tres productos en la misma máquina de 4 GB</td>
+          <td>Límites de memoria en los compose; decisión de CAX21 aparte antes de F4</td></tr>
+        <tr><td>Copiar temario de editorial sin querer</td><td>Buena intención y mala memoria</td>
+          <td>Cesion de derechos firmada, fuentes citadas por versión y auditoría append-only</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2><span class="dot"></span>Cómo se comprueba lo que digo</h2>
+    <p class="lead">Sin fe. Estos comandos, en este orden, dicen si F0 está cerrada o no.</p>
+    <pre><code>cd core
+JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 ./gradlew test      # 6 clases, tiene que haber resultados en build/test-results
+gradle test --rerun-tasks -i | grep -c 'PASSED'                # el número, no la sensación
+
+cd ../web
+npm run typecheck && npm run build                             # React 19 + Next 15
+
+cd ..
+make dev && make migrate && make seed                          # stack desde cero
+curl -s localhost:8080/healthz                                # {"estado":"ok"}
+git ls-files | grep -E '^\.env$|\.pem$|id_rsa' || echo 'sin secretos'</code></pre>
+    <div class="note note-ok"><b>Regla de honestidad</b>: una fase con el código escrito y sin los comandos en verde se marca
+      <b>amarilla</b>, no verde. Un test que no corre está en rojo, aunque el archivo exista.</div>
+  </section>
+
+  <section>
+    <h2><span class="dot"></span>Documentación</h2>
+    <div class="grid g3">
+      <div class="card"><h4>Producto</h4><ul>
+        <li><code>docs/alcance-v0.md</code> — qué es y qué no</li>
+        <li><code>docs/plan-implementacion.md</code> — fases y stack</li>
+        <li><code>docs/decisiones.md</code> — D1–D11</li>
+        <li><code>docs/marca.md</code> — nombre, voz, paleta</li>
+      </ul></div>
+      <div class="card"><h4>Operación</h4><ul>
+        <li><code>docs/infra-servidor.md</code> — dimensionado</li>
+        <li><code>docs/runbooks/backup-restauracion.md</code></li>
+        <li><code>docs/runbooks/job-atascado.md</code></li>
+        <li><code>infra/README.md</code> — compose y Caddy</li>
+      </ul></div>
+      <div class="card"><h4>Legal</h4><ul>
+        <li><code>docs/legal/rgpd.md</code> — bases y plazos</li>
+        <li><code>docs/legal/cesion-derechos.md</code> — licencia del temario</li>
+        <li><code>docs/legal/consent/renuncia-desistimiento.v1.md</code></li>
+      </ul></div>
+    </div>
+  </section>
+</main>
+<footer>
+  <div class="wrap">Winopo · hoja de ruta viva · si algo de esta página no coincide con el repositorio, manda el repositorio.</div>
+</footer>
+</body>
+</html>

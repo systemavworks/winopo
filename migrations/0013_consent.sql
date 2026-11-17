@@ -1,0 +1,4 @@
+-- 0013_consent · consent con fecha, IP y version del texto
+-- Fase F5 · pendiente de implementar.
+--
+-- Se crea cuando arranca la fase; el numero queda reservado para que el orden no se rompa.

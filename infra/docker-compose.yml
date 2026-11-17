@@ -1,0 +1,66 @@
+name: winopo
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-winopo}
+      POSTGRES_USER: ${POSTGRES_USER:-winopo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cambiame}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-winopo} -d ${POSTGRES_DB:-winopo}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports: ["8025:8025", "1025:1025"]
+
+  core:
+    profiles: [app]
+    build:
+      context: ..
+      dockerfile: core/Dockerfile
+    environment:
+      WINOPO_PROFILE: api
+      # El driver JDBC necesita el prefijo jdbc:. Sin él, Hikari no arranca.
+      DATABASE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-winopo}?user=${POSTGRES_USER:-winopo}&password=${POSTGRES_PASSWORD:-cambiame}
+      SESSION_SECRET: ${SESSION_SECRET:-secreto-local-de-desarrollo-32-caracteres}
+      PORT: 8080
+      APP_ENV: local
+    depends_on:
+      db: { condition: service_healthy }
+    ports: ["8080:8080"]
+
+  worker:
+    profiles: [app]
+    build:
+      context: ..
+      dockerfile: core/Dockerfile
+    environment:
+      WINOPO_PROFILE: worker
+      DATABASE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-winopo}?user=${POSTGRES_USER:-winopo}&password=${POSTGRES_PASSWORD:-cambiame}
+      SESSION_SECRET: ${SESSION_SECRET:-secreto-local-de-desarrollo-32-caracteres}
+      APP_ENV: local
+    depends_on:
+      db: { condition: service_healthy }
+
+  web:
+    profiles: [app]
+    build:
+      context: ..
+      dockerfile: web/Dockerfile
+    environment:
+      WINOPO_API_URL: http://core:8080
+      PORT: 3000
+    depends_on: [core]
+    ports: ["3000:3000"]
+
+volumes:
+  db-data:

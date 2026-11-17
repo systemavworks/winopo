@@ -1,0 +1,4 @@
+-- 0006_tema_version · tema_version inmutable por trigger + tema_fuente
+-- Fase F1 · pendiente de implementar.
+--
+-- Se crea cuando arranca la fase; el numero queda reservado para que el orden no se rompa.

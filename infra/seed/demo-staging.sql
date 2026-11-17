@@ -1,0 +1,3 @@
+-- Demo de staging: 5 temas y 100 preguntas reales, sin alumnos.
+-- Se construye en F1–F2 a partir del material que ceda el primer preparador,
+-- con la cesión de derechos firmada antes de subir una sola línea (docs/legal/cesion-derechos.md).
