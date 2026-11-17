@@ -12,6 +12,10 @@ Una plataforma donde un **preparador** publica su temario, sus tests y sus supue
 se examinan y reciben corrección con criterios explícitos. La plataforma pone la herramienta; el preparador pone el
 contenido y la autoridad pedagógica.
 
+Y donde un **opositor sin preparador** hace lo mismo por su cuenta: sube sus apuntes, maqueta su temario, se hace
+tests, entrega supuestos y ensaya la exposición oral. No es un modo degradado de la plataforma: es un espacio propio
+con su propio plan (D12). Si más adelante se vincula a un preparador, conserva su historial.
+
 **Qué no es**, y conviene escribirlo antes de diseñar nada:
 
 - No es una academia: no hay profesores propios en v1.
@@ -19,29 +23,62 @@ contenido y la autoridad pedagógica.
 - No sustituye al preparador: la IA **nunca** fija la clave de un test ni la nota final.
 - No aloja libros de editorial: solo enlaces y material propio del preparador con cesión firmada.
 
-## 2. Las dos caras, un solo dataset
+## 2. Dos espacios, un mismo dataset
 
-| | Preparador | Opositor |
+La unidad de aislamiento es el **espacio** (`tenant`), y hay dos tipos:
+
+| | Espacio preparador | Espacio opositor |
 |---|---|---|
-| Ve | Sus grupos, su temario, entregas, estadísticas por tema | Su temario, sus tests, sus notas, su progreso |
-| Hace | Publica y versiona temario, corrige, programa tests | Estudia, hace tests, entrega supuestos |
-| Nunca | Ve datos de otro preparador | Ve temario no publicado |
+| Quién | Un preparador y los opositores vinculados | Un opositor que prepara por su cuenta |
+| Ve | Sus grupos, su temario, entregas, estadísticas por tema | Su temario, sus tests, sus correcciones, su progreso |
+| Hace | Publica y versiona temario, corrige, programa tests, da accesos | Estudia, sube apuntes, maqueta, hace tests, entrega supuestos, ensaya el oral |
+| Nunca | Ve datos de otro preparador | Ve temario no publicado ni datos de otro opositor |
 
 Son **dos shells de interfaz sobre un único backend y una única base de datos**. Dos rutas, dos menús, dos
 permisos; ni dos productos ni dos bases. El error caro aquí es duplicar el modelo de datos «porque son públicos
 distintos»: el dato es el mismo y cambia quién lo mira.
 
-## 3. Aislamiento por preparador
+### 2.1 Vinculación entre espacios
 
-Cada preparador es un **tenant**. Toda tabla con `tenant_id` lleva RLS forzado, como en Billka: sin contexto de
-tenant no se ve una fila. Un preparador no puede, ni por error de código, leer el temario de otro.
+El opositor **no** pertenece al preparador: tiene su propio tenant. Lo que existe es una vinculación opcional.
 
-El opositor pertenece a **un** preparador en v1 (relación 1:1). Cambiar de preparador es un alta nueva, no una
-migración de historial.
+```
+tenant(tipo = preparador | opositor)
+vinculacion(tenant_opositor_id, tenant_preparador_id, estado, desde, hasta)
+```
+
+- Como mucho **una vinculación activa** por opositor en v1 (se mantiene el espíritu de D1, sin que el opositor
+  deje de ser espacio propio).
+- Al vincularse, el opositor recibe el material **publicado** del preparador y sus tests programados; el
+  preparador ve el progreso de estudio de ese opositor.
+- Al desvincularse, la fila se cierra (`hasta`) y el opositor conserva su temario propio, su historial y sus
+  correcciones. No se borra nada suyo para «devolverlo» a un estado anterior.
+- El alta del preparador sigue siendo manual: el material publicado tiene que tener responsable identificado.
+
+## 3. Aislamiento por espacio
+
+Toda tabla con `tenant_id` lleva RLS forzado, como en Billka: sin contexto de tenant no se ve una fila. Un
+preparador no puede, ni por error de código, leer el temario de otro; y un opositor no puede leer los apuntes de
+otro opositor.
+
+Hay **tres** lecturas cruzadas permitidas, y solo tres:
+
+1. `vinculacion` — el preparador ve el progreso de estudio del opositor vinculado (temas, tests, notas,
+   correcciones). No ve su material privado ni nada fuera de la plataforma.
+2. `material_publicado` — lo que el preparador publica lo ven sus vinculados. Un opositor no vinculado no ve nada,
+   ni por enlace directo: el permiso se comprueba en el servidor.
+3. `directorio` — la ficha pública del preparador (materia, plazas, contacto). Es dato profesional, no dato
+   personal del opositor.
+
+El opositor puede vivir toda la vida de la plataforma sin vincularse a nadie. Si se vincula y luego cambia de
+preparador, se cierra una vinculación y se abre otra: el historial es suyo y no se migra al preparador.
 
 ## 4. Módulos y comercialización
 
-Se venden por **módulo de oposición** y por **temporada** (septiembre–mayo), no por suscripción mensual continua:
+Se venden por **módulo de oposición** y por **temporada** (septiembre–mayo), no por suscripción mensual continua.
+Cada espacio tiene su propia escala, porque cada uno paga lo suyo:
+
+**Espacio preparador**
 
 | Nivel | Incluye |
 |---|---|
@@ -50,9 +87,24 @@ Se venden por **módulo de oposición** y por **temporada** (septiembre–mayo),
 | + Preparador | Corrección humana y tutoría |
 | Curso completo | Todo lo anterior + vídeo |
 
-Regla de precio: **el software no puede pasar del 10 % de lo que el preparador factura por alumno**. Si el
-preparador cobra 60 €/mes por alumno, el módulo no puede costar 6 €/mes. Falta el dato real del preparador para
-fijar tarifas (D9).
+**Espacio opositor**
+
+| Nivel | Incluye |
+|---|---|
+| Base | Temario y apuntes propios maquetados, tests y plan de estudio |
+| + IA | Supuestos con rúbrica y **tribunal simulado** |
+| Vinculado | Lo que publique el preparador al que se vincule; la tutoría, si la hay, se la paga él a su preparador |
+| Curso completo | Base + IA + vídeo de repaso |
+
+Dos reglas de precio, no una:
+
+1. **Preparador**: el software no puede pasar del 10 % de lo que factura por alumno. Si cobra 60 €/mes por alumno,
+   el módulo no puede costar 6 €/mes.
+2. **Opositor**: el plan individual tiene que salir más barato que **mandar maquetar el temario por fuera** (hoy se
+   cobra 40–90 € por tema, según F2.5). Si no sale más barato, no hay razón para contratarlo.
+
+Falta el dato real del preparador para fijar tarifas (D9). Cobrar al opositor exige Stripe con cliente final
+persona física (D13), que es un circuito distinto del cobro a una academia.
 
 ## 5. Reglas de IA (no negociables)
 
@@ -62,6 +114,10 @@ fijar tarifas (D9).
 4. Todo material generado se etiqueta con la versión de temario de la que salió.
 5. Un supuesto corregido por IA **no cuenta** para la nota si el preparador no lo valida.
 6. El prompt de corrección publica su rúbrica: qué puntúa, cuánto y con qué tolerancia.
+7. El **tribunal simulado no emite nota oficial**: devuelve un informe orientativo, siempre etiquetado como
+   simulación, con `modelo` y `prompt_version`.
+8. Si se graba voz, hay consentimiento explícito, se dice cuánto se conserva y se puede borrar. El audio **no** se
+   usa para entrenar modelos.
 
 Sin 2, 3 y 4 el sistema no es auditable y el preparador no puede defender una nota ante un alumno.
 
@@ -108,6 +164,27 @@ es un derivado: se regenera, nunca se edita a mano, porque un PDF editado a mano
 Complementa a §7 y no lo sustituye: maquetar no da derechos sobre el material. Sigue haciendo falta la cesión
 firmada para alojarlo.
 
+### 7.2 Del temario al material de estudio
+
+El mismo contenido produce más de un entregable, y no es un adorno: es lo que hoy se encarga y se paga por fuera.
+
+| Entregable | Cómo se genera | Quién lo usa |
+|---|---|---|
+| PDF maquetado | WeasyPrint sobre la versión del tema | Estudio e impresión |
+| Esquema / mapa del tema | Epígrafes y relaciones extraídos del propio texto | Repaso rápido |
+| Línea de tiempo | Fechas detectadas en el tema, revisadas por una persona | Historia, normativa |
+| Presentación (PPTX) | Diapositivas desde epígrafes y tablas | Clase del preparador y material vendible |
+| Animación / vídeo de repaso | Voz sintética + diapositivas (§6) | Repaso y venta de material |
+| Test de autoevaluación | Preguntas del banco asociadas al tema | Estudio activo |
+
+Límite explícito: **se deriva del texto, no se inventa**. Si el tema no trae fechas, no hay línea de tiempo; si no
+hay epígrafes, no hay esquema. Todo entregable lleva la versión del tema de la que salió, para poder rehacerlo
+cuando cambie la convocatoria.
+
+Quien produce y vende material (hay un mercado real: se cobra por tema maquetado) encuentra aquí la parte que hoy
+hace a mano en Word y Canva. Producirlo y exportarlo entra en el producto; **venderlo dentro** de la plataforma
+está en estudio (D14).
+
 ## 8. El diferencial: corrección con rúbrica explícita
 
 Los competidores ya tienen tests con estadísticas. Lo que no hay, o casi no hay:
@@ -115,21 +192,44 @@ Los competidores ya tienen tests con estadísticas. Lo que no hay, o casi no hay
 1. Corrección de supuestos con **rúbrica publicada** (puntos por apartado, tolerancias, penalizaciones).
 2. Trazabilidad de quién corrigió: IA, preparador o validado.
 3. Temario **versionado** con fuentes citadas y vídeo atado a la versión.
-4. Las dos caras (preparador y opositor) sobre **el mismo dataset**, no dos herramientas pegadas con un Excel en
-   medio.
+4. Los dos espacios (preparador y opositor) sobre **el mismo dataset**, no dos productos con un Excel en medio.
+5. **Tribunal simulado**: exponer en voz alta, con repreguntas y un informe que dice en qué se cae, sin inventarse
+   una nota oficial.
 
-Si el producto no hace 1 y 2, es otro simulador de tests y compite por precio. Eso hay que decidirlo antes de
+Si el producto no hace 1, 2 y 5, es otro simulador de tests y compite por precio. Eso hay que decidirlo antes de
 escribir código, no después.
+
+### 8.1 Tribunal simulado
+
+El ejercicio oral se prepara leyendo, y se pierde por no haberlo dicho en voz alta nunca. WinOpo ofrece un ensayo:
+
+| Pieza | Regla |
+|---|---|
+| Entrada | El opositor elige tema y duración; opcionalmente sube su guion |
+| Desarrollo | Expone hablando; el tribunal artificial interrumpe, pide aclaraciones y repregunta |
+| Salida | Informe: tiempo por bloque, estructura, muletillas, preguntas que no supo responder |
+| Lo que no es | Nota oficial, sustituto del preparador ni grabación publicada |
+| Datos | Consentimiento de grabación, plazo de conservación explícito y borrado a petición (§5, regla 8) |
+
+Coste: es voz + transcripción + evaluación. Se cobra dentro del módulo + IA, nunca por minuto suelto: un opositor
+que ensaya diez veces no puede quedarse con la sensación de estar echando monedas.
+
+Riesgo asumido: evaluar un oral es más subjetivo que corregir un test, y el informe puede desanimar a quien mejora
+despacio. Por eso el informe puntúa **conducta** (estructura, tiempo, claridad) y no «capacidad» de la persona, y
+siempre termina con qué hacer en el siguiente ensayo.
 
 ## 9. Legal y datos
 
 | # | Tema | Estado |
 |---|---|---|
-| D2 | Acceso al módulo hasta 31-may | Pendiente |
-| D3 | Renuncia al desistimiento (art. 103.m TRLGDCU) con clic en checkout | **Obligatorio antes de vender** |
-| D4 | IVA 21 % o exención de enseñanza | Consultar asesor |
-| D5 | Precio de renovación para quien repite | Pendiente |
+| L1 | Acceso al módulo hasta 31-may | Pendiente |
+| L2 | Renuncia al desistimiento (art. 103.m TRLGDCU) con clic en checkout | **Obligatorio antes de vender** |
+| L3 | IVA 21 % o exención de enseñanza | Consultar asesor |
+| L4 | Precio de renovación para quien repite | Pendiente |
 | D7 | Responsable del tratamiento: ¿preparador o plataforma? | Pendiente |
+
+Los códigos `L*` son trámites legales y se numeran aparte a propósito: antes usaban `D2`–`D5`, que ya estaban
+ocupados por decisiones técnicas en `docs/decisiones.md`, y nadie sabía de qué se hablaba en una reunión.
 
 D7 condiciona el contrato, el aviso legal y el encargado de tratamiento. Si el preparador es responsable, la
 plataforma es encargada y necesita contrato de encargo (art. 28 RGPD). Si es al revés, la plataforma responde de
@@ -139,11 +239,15 @@ los datos de menores de los opositores. **No es un detalle de redacción.**
 
 | # | Decisión | Estado |
 |---|---|---|
-| D1 | ¿El preparador puede ser alumno de otro preparador? | Recomendado: no en v1 |
+| D1 | ¿El preparador puede ser alumno de otro preparador? | Recomendado: no en v1 (ver D12: el opositor ya es espacio propio) |
 | D6 | Nombre y dominio | **Cerrado**: `winopo.es` (17-nov-2026) |
 | D8 | Vídeo: voz + diapositivas o avatar | Recomendado: voz + diapositivas |
 | D9 | Precio por módulo | Bloqueado: falta el precio actual del preparador |
 | D10 | ¿Se cobra el alta del preparador? | Recomendado: no; se cobra por alumno |
+| D12 | ¿El opositor sin preparador tiene espacio propio? | **Cerrado**: sí, tenant `opositor` con vinculación opcional (17-nov-2026) |
+| D13 | ¿Cómo paga el opositor? | Pendiente: Stripe persona física, plan de temporada |
+| D14 | ¿Se vende material dentro de la plataforma? | Pendiente: hoy se produce y se exporta; cobrar exige comisión, facturas y soporte |
+| D15 | Tribunal simulado: ¿voz en directo o audio grabado? | Recomendado: audio grabado + transcripción (más barato y auditable) |
 
 ## 11. Competencia real
 

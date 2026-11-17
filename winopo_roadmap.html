@@ -89,7 +89,7 @@
       Todo lo demás está planificado, no empezado.</p>
     <div class="kpi">
       <div><div class="n">20</div><div class="l">semanas de desarrollo previstas</div></div>
-      <div><div class="n">7</div><div class="l">fases (F0–F5 + F2.5)</div></div>
+      <div><div class="n">8</div><div class="l">fases (F0–F5 + F2.5 + F3.5)</div></div>
       <div><div class="n">29</div><div class="l">pruebas del core en verde (6 clases)</div></div>
       <div><div class="n">0</div><div class="l">secretos en el repositorio</div></div>
     </div>
@@ -149,10 +149,13 @@
           calidad. <a href="#maquetacion">Detalle</a>.</td><td>2</td><td><span class="badge b-violet">nueva</span></td></tr>
         <tr><td><b>F3</b></td><td>Supuestos con rúbrica por apartados, corrección IA, validación humana y comparativa IA vs preparador.</td>
           <td>4</td><td><span class="badge b-todo">no empezada</span></td></tr>
+        <tr><td><b>F3.5</b></td><td><b>Tribunal simulado</b>: ensayo del oral con audio grabado, transcripción e informe de
+          conducta. Sin nota oficial. <a href="#tribunal">Detalle</a>.</td><td>2</td><td><span class="badge b-violet">nueva</span></td></tr>
         <tr><td><b>F4</b></td><td>Vídeo (voz sintética + diapositivas), atado a la versión del tema, y demo de 3 semanas que caduca sola.</td>
           <td>3</td><td><span class="badge b-todo">no empezada</span></td></tr>
-        <tr><td><b>F5</b></td><td>Cobro con Stripe, webhooks idempotentes, facturas, consentimiento de renuncia al desistimiento, alta de los
-          3 primeros preparadores.</td><td>3</td><td><span class="badge b-todo">no empezada</span></td></tr>
+        <tr><td><b>F5</b></td><td>Cobro con Stripe (preparador y, si se cierra D13, plan del opositor), webhooks idempotentes,
+          facturas, consentimiento de renuncia al desistimiento, alta de los 3 primeros preparadores.</td><td>3</td>
+          <td><span class="badge b-todo">no empezada</span></td></tr>
       </tbody>
     </table>
     <p class="lead" style="margin-top:14px">Con un solo desarrollador y sin imprevistos, arrancar el 1-dic-2026 lleva a finales de
@@ -209,6 +212,46 @@
       plantilla única y en los avisos: se dice qué está mal, no se arregla por arte de magia. Lo que requiera criterio
       editorial (figuras, tablas complejas) sigue siendo trabajo humano, y eso se puede vender como servicio.</div>
   </section>
+  <section id="tribunal">
+    <h2><span class="dot" style="background:#c2410c"></span>F3.5 · Tribunal simulado: el oral que nadie ensaya</h2>
+    <p class="lead">El ejercicio oral se prepara leyendo, y se pierde por no haberlo dicho en voz alta nunca. Un opositor
+      puede llevar seis meses de temario y quedarse en blanco en los primeros treinta segundos. Nadie ensaya solo en el
+      salón porque no hay quien pregunte.</p>
+    <div class="grid g3">
+      <div class="card new"><h4>Qué hace</h4><ul>
+        <li>El opositor elige tema y duración, y expone en voz alta.</li>
+        <li>El tribunal artificial interrumpe, pide aclaraciones y repregunta.</li>
+        <li>Al terminar: informe de tiempos, estructura, muletillas y preguntas sin responder.</li>
+      </ul></div>
+      <div class="card new"><h4>Qué se guarda</h4><ul>
+        <li>Audio, transcripción e informe, atados al tema y a su versión.</li>
+        <li><code>modelo</code> y <code>prompt_version</code> en cada informe.</li>
+        <li>Consentimiento de grabación explícito y borrado a petición.</li>
+      </ul></div>
+      <div class="card new"><h4>Qué no hace, a propósito</h4><ul>
+        <li>No emite nota oficial: es una simulación y así se dice en el informe.</li>
+        <li>No puntúa «capacidad» de la persona, solo conducta: estructura, tiempo, claridad.</li>
+        <li>No sustituye al preparador ni se publica en ningún sitio.</li>
+      </ul></div>
+    </div>
+    <h3>Pipeline</h3>
+    <pre><code>tema + guion (opcional)
+        │
+        ├─ grabar ───────▶ audio (R2, URL firmada de corta duración)
+        │
+        ├─ transcribir ──▶ texto con marcas de tiempo
+        │
+        └─ evaluar ──────▶ informe (estructura, tiempos, muletillas, preguntas)
+                              │
+                              └─ modelo + prompt_version + version del tema</code></pre>
+    <p class="lead">Audio grabado y no conversación en tiempo real (D15): cuesta menos, es auditable y no castiga a quien
+      tiene mala conexión. El directo se reserva a los preparadores que quieran tutelar el oral, que es otro producto.</p>
+    <div class="note"><b>Aceptación</b>: un opositor graba un tema de 10 minutos y recibe transcripción e informe en
+      menos de 3 minutos; en una prueba ciega, el informe señala los mismos dos puntos flojos que el preparador.</div>
+    <div class="note note-warn"><b>Riesgo honesto</b>: evaluar un oral es más subjetivo que corregir un test, y un
+      informe duro desanima a quien mejora despacio. Por eso puntúa conducta y siempre termina en qué hacer en el
+      siguiente ensayo. Y cuesta dinero real por ensayo: va dentro del módulo + IA, nunca por minuto suelto.</div>
+  </section>
   <section>
     <h2><span class="dot"></span>Decisiones que ya están tomadas</h2>
     <p class="lead">Detalle completo en <code>docs/decisiones.md</code>. Si algo de aquí se cambia, se cambia también allí, en el
@@ -216,7 +259,7 @@
     <table>
       <thead><tr><th style="width:64px">#</th><th>Decisión</th><th>Motivo en una línea</th><th style="width:110px">Estado</th></tr></thead>
       <tbody>
-        <tr><td><b>D1</b></td><td>Un opositor, un preparador</td><td>Dos dueños del mismo historial es un dolor de cabeza legal y de producto; cambiar de preparador es una migración explícita.</td><td><span class="badge b-ok">firme</span></td></tr>
+        <tr><td><b>D1</b></td><td>Una vinculación activa por opositor</td><td>Dos dueños del mismo historial es un dolor de cabeza legal y de producto. Revisada el 17-nov-2026: el opositor es tenant propio (D12); lo único que se limita a uno es la vinculación.</td><td><span class="badge b-ok">firme</span></td></tr>
         <tr><td><b>D2</b></td><td>RLS forzada, no opcional</td><td>Si el aislamiento depende de que el código se acuerde de filtrar,
         algún día no se acordará.</td><td><span class="badge b-ok">firme</span></td></tr>
         <tr><td><b>D3</b></td><td>El rol <code>winopo_app</code> se crea fuera de las migraciones</td><td>Un rol con contraseña no
@@ -237,6 +280,12 @@
         despliegue menos que se rompe. Se revisa si se migra a x86.</td><td><span class="badge b-ok">firme</span></td></tr>
         <tr><td><b>D11</b></td><td>Maquetación con WeasyPrint en contenedor aparte</td><td>HTML+CSS ya es el lenguaje de la plantilla; LaTeX
         en ARM64 es una dependencia enorme para el mismo resultado.</td><td><span class="badge b-violet">nueva</span></td></tr>
+        <tr><td><b>D12</b></td><td>Dos tipos de tenant: preparador y opositor</td><td>El opositor que prepara por su cuenta
+        también es cliente: sin espacio propio no puede existir ni pagar.</td><td><span class="badge b-violet">nueva</span></td></tr>
+        <tr><td><b>D13</b></td><td>Cobro al opositor (B2C)</td><td>Circuito distinto al de la academia: datos fiscales,
+        desistimiento y soporte de reclamaciones.</td><td><span class="badge b-todo">pendiente</span></td></tr>
+        <tr><td><b>D15</b></td><td>Tribunal simulado con audio grabado</td><td>Más barato y auditable que el directo, y no
+        castiga a quien tiene mala conexión.</td><td><span class="badge b-violet">nueva</span></td></tr>
       </tbody>
     </table>
   </section>
@@ -253,6 +302,7 @@
       </ul></div>
       <div class="card"><h4>Antes de cobrar (F5)</h4><ul>
         <li><b>D9</b> — precio real del preparador por opositor, con al menos un preparador dispuesto a firmarlo.</li>
+        <li><b>D13</b> — decidir si el opositor autónomo paga (Stripe B2C) y con qué plan; afecta a la página de precios y al soporte.</li>
         <li>Búsqueda en OEPM y EUIPO, clase 41 (formación), sin conflictos.</li>
         <li>Texto de renuncia al desistimiento revisado (art. 103.m TRLGDCU).</li>
         <li>Contrato de cesión de derechos revisado por abogado.</li>
@@ -313,7 +363,7 @@ git ls-files | grep -E '^\.env$|\.pem$|id_rsa' || echo 'sin secretos'</code></pr
       <div class="card"><h4>Producto</h4><ul>
         <li><code>docs/alcance-v0.md</code> — qué es y qué no</li>
         <li><code>docs/plan-implementacion.md</code> — fases y stack</li>
-        <li><code>docs/decisiones.md</code> — D1–D11</li>
+        <li><code>docs/decisiones.md</code> — D1–D15</li>
         <li><code>docs/marca.md</code> — nombre, voz, paleta</li>
       </ul></div>
       <div class="card"><h4>Runbooks</h4><ul>

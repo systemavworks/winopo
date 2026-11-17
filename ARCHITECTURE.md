@@ -6,9 +6,11 @@
 
 ## 1. Resumen en una frase
 
-WinOpo es un SaaS **multi-preparador** (cada preparador es un espacio aislado) donde el opositor
-estudia temario maquetado, hace tests corregidos automáticamente, resuelve supuestos prácticos y
-ve su progreso; el preparador paga y responde ante sus opositores.
+WinOpo es un SaaS **multi-tenant con dos tipos de espacio** —preparador y opositor— donde el opositor
+estudia temario maquetado, hace tests corregidos automáticamente, resuelve supuestos prácticos, ensaya
+la exposición ante un tribunal simulado y ve su progreso; el preparador publica, corrige y responde ante
+sus opositores. El opositor puede usar la plataforma sin preparador (D12) y vincularse después sin
+perder su historial.
 
 Tres decisiones mandan sobre todas las demás:
 
@@ -204,7 +206,7 @@ el campo se omite.
 |---|---|---|
 | Cloudflare R2 (S3) | PDFs, vídeos, escaneos de temario | nunca se sirve el binario directo: URLs firmadas de corta duración |
 | IA (corrección asistida) | corregir supuestos prácticos | interfaz propia (`CorrectorIA`); el proveedor se cambia sin tocar el dominio; **no** se envían datos personales del opositor, solo el texto del supuesto |
-| Stripe | cobros del preparador | solo el preparador paga; el opositor nunca introduce tarjeta |
+| Stripe | cobros del preparador y del plan del opositor | dos circuitos separados: academia (B2B) y persona física (B2C, D13); el opositor vinculado no paga al preparador por aquí |
 | WeasyPrint (`maquetador`) | generar PDF desde HTML | contenedor aparte: sus dependencias nativas no contaminan la imagen de `core` (D11) |
 
 Regla general: **ningún servicio externo recibe identificadores internos** (ni `tenant_id` ni `user_id`);
@@ -220,6 +222,8 @@ Enumerado para que nadie asuma que existe:
 | Cola `job` | `JobQueue.reclamarSiguiente()` devuelve `null` a propósito: el worker late cada 2 s y no finge trabajo |
 | Handlers del worker (maquetación, extracción, corrección) | no existen |
 | `CorrectorIA` | interfaz definida, sin implementación de proveedor |
+| Tribunal simulado (voz, transcripción, informe) | especificado en `docs/alcance-v0.md` §8.1 y D15; sin código, sin tabla y sin migración |
+| Material derivado (esquemas, PPTX, línea de tiempo) | especificado en §7.2 del alcance; depende de que exista F2.5 |
 | Subida a R2 | no implementada |
 | Stripe | no implementado |
 | `next build` | **en verde** (17-nov-2026): compila, 7 rutas, tipos válidos |
@@ -242,9 +246,10 @@ Enumerado para que nadie asuma que existe:
 ## 12. Decisiones relacionadas
 
 `docs/decisiones.md` es la fuente de verdad. Las que afectan a esta arquitectura:
-D1 (un preparador por opositor), D3 (Kotlin/Ktor), D4 (Next.js), D6 (RLS en la base),
-D7 (responsable del tratamiento, pendiente), D9 (precio, pendiente), D10 (PBKDF2),
-D11 (WeasyPrint en contenedor aparte).
+D1 (una vinculación activa por opositor), D12 (dos tipos de tenant: preparador y opositor), D3 (Kotlin/Ktor),
+D4 (Next.js), D6 (RLS en la base), D7 (responsable del tratamiento, pendiente), D9 (precio, pendiente),
+D10 (PBKDF2), D11 (WeasyPrint en contenedor aparte), D13 (cobro al opositor, pendiente),
+D15 (tribunal simulado con audio grabado).
 
 - Despliegue: [`DEPLOY.md`](DEPLOY.md)
 - Plan y fases: [`winopo_roadmap.html`](winopo_roadmap.html)

@@ -15,6 +15,10 @@ se da de baja y se da de alta.
 **Descartado**: pertenencia múltiple. Multiplica los casos límite (¿de quién es la corrección?, ¿quién paga?) sin
  resolver un problema que hoy nadie tiene.
 
+> **Revisada el 17-nov-2026 (ver D12).** El opositor deja de «pertenecer» a un preparador: es un **tenant propio**.
+> Lo que se limita a uno es la **vinculación activa**, no la identidad. El motivo del cambio no es técnico: un
+> opositor que prepara por su cuenta también es cliente, y con el modelo anterior no tenía dónde existir.
+
 ---
 
 ## D2 · RLS forzada, no opcional
@@ -109,3 +113,65 @@ El PDF del temario se genera desde HTML + CSS con WeasyPrint, en un contenedor p
  cientos de megabytes; (3) aislar Python evita que el core dependa de librerías del sistema.
 
 El PDF es un derivado reproducible de `tema_version` + hash de plantilla. No se edita a mano.
+
+---
+
+## D12 · Dos tipos de tenant: preparador y opositor
+
+**Decidido** (17-nov-2026): el `tenant` tiene un tipo, `preparador` u `opositor`. Todo usuario tiene su propio
+espacio. La relación entre ambos es una **vinculación opcional** (`vinculacion`), con como mucho una activa por
+opositor en v1.
+
+**Por qué**: el opositor que prepara por su cuenta es un cliente completo, no un usuario a la espera de que alguien
+lo dé de alta. Sube sus apuntes, maqueta, hace tests, entrega supuestos y ensaya el oral. Si el modelo lo obliga a
+depender de un preparador, ese cliente no puede pagar ni existir, y el producto se queda con la mitad del mercado.
+
+**Cómo se mantiene el aislamiento**: `tenant_id` sigue en todas las tablas y la RLS no se relaja. Lo único que
+cambia es que el contexto de tenant puede ser de tipo `opositor`. Las tres lecturas cruzadas permitidas están
+enumeradas en `docs/alcance-v0.md` §3.
+
+**Descartado**: un único tipo de tenant con un rol «opositor autónomo» dentro del espacio de un preparador ficticio
+(el «tenant cero»). Es un parche que contamina todos los informes y acaba en fugas cuando alguien filtra por tipo.
+
+**Consecuencia de producto**: dos escalas de precio (§4 del alcance) y dos circuitos de cobro (D13).
+
+---
+
+## D13 · El opositor paga su propio plan
+
+**Pendiente**: cómo cobra al opositor persona física (Stripe B2C), con qué periodicidad (temporada, no mes suelto) y
+qué pasa si además está vinculado a un preparador que ya paga por él.
+
+**Decidido de momento**: dos circuitos separados. La academia paga por sus alumnos; el opositor autónomo paga su
+plan. Un opositor no paga dos veces por el mismo material: si su preparador ya cubre el módulo, su plan propio se
+limita a lo que el preparador no da (por ejemplo, tribunal simulado).
+
+**Por qué no se puede improvisar**: facturación a consumidor final exige datos fiscales, derecho de desistimiento
+(art. 103.m TRLGDCU ya previsto) y soporte de reclamaciones. No es «el mismo Stripe con otro precio».
+
+---
+
+## D14 · Venta de material dentro de la plataforma
+
+**Pendiente, y a propósito**: hoy el material se produce y se exporta; comprarlo y venderlo dentro exige comisión,
+facturación al comprador, resolución de disputas y responsabilidad sobre lo que se vende. Antes de abrirlo hay que
+saber quién responde si el material vendido está copiado de una editorial.
+
+**Decidido de momento**: se cubre la parte que hoy se hace a mano (maquetar, esquematizar, presentar) y se deja la
+transacción fuera. El landing lo dice tal cual: «en estudio», no «próximamente».
+
+**Por qué importa**: es la diferencia entre un producto que se puede lanzar en F2.5 y un marketplace que necesita un
+equipo legal.
+
+---
+
+## D15 · Tribunal simulado con audio grabado
+
+**Recomendado**: ensayo con audio grabado + transcripción + evaluación, no conversación en tiempo real.
+
+**Por qué**: es más barato (una subida, una transcripción, una evaluación), más auditable (queda el audio y el
+informe con `modelo` y `prompt_version`) y más justo con quien tiene mala conexión. El tiempo real se reserva para
+cuando haya preparadores que quieran tutelar el oral en directo, que es otro producto.
+
+**Límite no negociable**: el informe **no es una nota oficial** y se etiqueta como simulación. Puntúa conducta
+(estructura, tiempo, claridad) y no capacidad de la persona.

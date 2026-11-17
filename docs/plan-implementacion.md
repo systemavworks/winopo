@@ -1,6 +1,7 @@
 # WinOpo · plan de implementación
 
-**Estado**: borrador de trabajo · **Fecha**: 17-nov-2026 · **Objetivo**: plataforma operativa para 3 preparadores
+**Estado**: borrador de trabajo · **Fecha**: 17-nov-2026 · **Objetivo**: plataforma operativa para 3 preparadores y sus opositores, con espacio propio para el opositor que
+prepara por su cuenta (D12)
 antes de septiembre de 2027, empezando a vender módulos en la temporada 2027–2028.
 
 Este documento decide **cómo se construye**. El qué está en [`alcance-v0.md`](alcance-v0.md): si los dos discrepan,
@@ -59,7 +60,8 @@ Nada de microservicios, ni Kubernetes, ni colas gestionadas en v0: un servicio, 
 
 | Tabla | Clave para qué | Notas |
 |---|---|---|
-| `tenant` | Un preparador = un tenant | `slug`, `nombre`, `estado` |
+| `tenant` | Un espacio = un tenant (preparador u opositor) | `slug`, `nombre`, `estado`; **falta `tipo`** — migración pendiente (D12) |
+| `vinculacion` | Vínculo opcional opositor ↔ preparador | **No existe**: `tenant_opositor_id`, `tenant_preparador_id`, `estado`, `desde`, `hasta` (D12) |
 | `app_user` | Cuenta con login | Único por correo normalizado |
 | `membership` | Qué usuario pertenece a qué tenant y con qué rol | `preparador`, `opositor`, `admin` |
 | `temario` | Conjunto de temas de una oposición | Por tenant y convocatoria |
@@ -147,6 +149,16 @@ es un argumento concreto frente a Opogestión y crea dependencia sana: nadie mig
 - **Aceptación**: dos correcciones de la misma entrega, con el mismo prompt y modelo, producen el mismo desglose; y
   toda corrección indica quién la cerró. Una entrega corregida solo por IA **no** suma a la nota final.
 
+### F3.5 · Tribunal simulado — 2 semanas
+
+- Grabación del oral por tema y duración, con consentimiento explícito y plazo de conservación.
+- Transcripción con marcas de tiempo; evaluación de conducta (estructura, tiempos, muletillas, preguntas sin
+  responder) con `modelo` y `prompt_version`.
+- Informe etiquetado como simulación, con una acción concreta para el siguiente ensayo.
+- **Aceptación**: un audio de 10 minutos produce transcripción e informe en menos de 3 minutos; el informe coincide
+  con el preparador en los dos puntos flojos principales en una prueba ciega; borrar el ensayo borra audio,
+  transcripción e informe.
+
 ### F4 · Vídeo y demo — 3 semanas
 
 - Guion desde el tema, TTS, render de diapositivas, subida a R2, reproductor con progreso.
@@ -159,11 +171,14 @@ es un argumento concreto frente a Opogestión y crea dependencia sana: nadie mig
 - Stripe Checkout, webhooks idempotentes, facturas, cupones de temporada.
 - Checkout con **clic de renuncia al desistimiento** (art. 103.m TRLGDCU) guardado con fecha, IP y versión del texto.
 - Alta guiada de los 3 preparadores; panel de admin mínimo.
+- Plan del opositor autónomo **solo si se cierra D13**: es un checkout B2C distinto, con sus datos fiscales y su
+  propio soporte.
 - **Aceptación**: compra de prueba de un módulo, factura con IVA correcto, acceso concedido por webhook y no por
   retorno del navegador; consentimiento recuperable y auditable.
 
-**Total: 20 semanas** de desarrollo (18 originales + 2 de maquetación). Con un solo desarrollador y sin imprevistos,
-arrancar el 1-dic-2026 lleva a finales de abril de 2027, con margen hasta septiembre.
+**Total: 22 semanas** de desarrollo (18 originales + 2 de maquetación + 2 de tribunal simulado). Con un solo
+desarrollador y sin imprevistos, arrancar el 1-dic-2026 lleva a mediados de mayo de 2027, con margen hasta
+septiembre.
 
 ## 6. Entornos y CI
 

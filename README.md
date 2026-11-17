@@ -1,6 +1,6 @@
 # WinOpo
 
-Plataforma de preparación de oposiciones: el preparador publica su temario, sus tests y sus supuestos; sus opositores estudian, practican y reciben correcciones con **rúbrica explícita** y trazabilidad de quién corrigió.
+Plataforma de preparación de oposiciones con **dos espacios**: el preparador publica su temario, sus tests y sus supuestos y corrige a su grupo; el opositor estudia, practica, ensaya el oral y recibe correcciones con **rúbrica explícita** y trazabilidad de quién corrigió. El opositor puede prepararse por su cuenta y vincularse después a un preparador sin perder su historial (D12).
 
 > Código propietario. El repositorio es público para revisión; no se concede licencia de uso ni de redistribución.
 
@@ -18,8 +18,9 @@ planificados, no implementados. La hoja de ruta viva está en [`winopo_roadmap.h
 | F2 | Tests con clave fija | no empezada |
 | F2.5 | Maquetación del temario (PDF reproducible) | nueva |
 | F3 | Supuestos con rúbrica | no empezada |
+| F3.5 | Tribunal simulado (oral, informe de conducta) | nueva |
 | F4 | Vídeo y demo | no empezada |
-| F5 | Cobro y alta de preparadores | no empezada |
+| F5 | Cobro (preparador y, si se cierra D13, opositor) y alta de preparadores | no empezada |
 
 ## Estructura
 
