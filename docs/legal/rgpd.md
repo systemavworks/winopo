@@ -7,7 +7,7 @@
 | Concepto | Quién |
 |---|---|
 | Responsable del tratamiento | **Pendiente (D7)** |
-| Encargado del tratamiento | Winopo (alojamiento, IA, vídeo) si el responsable es el preparador |
+| Encargado del tratamiento | WinOpo (alojamiento, IA, vídeo) si el responsable es el preparador |
 | Subencargados | Hetzner (servidor), Cloudflare R2 (vídeo), proveedor de IA, Stripe (pagos) |
 
 Mientras D7 no esté cerrado, la política de privacidad **no se publica**.
@@ -18,7 +18,7 @@ Mientras D7 no esté cerrado, la política de privacidad **no se publica**.
 - **Actividad**: tests, respuestas, entregas, correcciones, notas.
 - **Contenido del opositor**: textos de supuestos. Pueden incluir datos personales por descuido.
 - **Vídeo**: solo si el preparador lo activa y con consentimiento explícito y separado.
-- **Pago**: gestionado por Stripe. Winopo no almacena números de tarjeta.
+- **Pago**: gestionado por Stripe. WinOpo no almacena números de tarjeta.
 
 ## 3. Base jurídica
 

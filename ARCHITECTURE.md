@@ -1,4 +1,4 @@
-# Arquitectura de Winopo
+# Arquitectura de WinOpo
 
 > Documento de referencia del sistema en v0. Describe **lo que hay**, no lo que nos gustaría.
 > Cuando algo no existe todavía, está en la sección [Lo que no está](#10-lo-que-no-está).
@@ -6,7 +6,7 @@
 
 ## 1. Resumen en una frase
 
-Winopo es un SaaS **multi-preparador** (cada preparador es un espacio aislado) donde el opositor
+WinOpo es un SaaS **multi-preparador** (cada preparador es un espacio aislado) donde el opositor
 estudia temario maquetado, hace tests corregidos automáticamente, resuelve supuestos prácticos y
 ve su progreso; el preparador paga y responde ante sus opositores.
 
@@ -73,7 +73,11 @@ Next, se cachea en Caddy y una caída del backend no deja la web comercial en bl
 redirige `/login`, `/app*` y `/v1*` del apex a `app.winopo.es`.
 
 `landing/` se monta como volumen de solo lectura en `/srv/landing` dentro del contenedor de Caddy.
-Cambiar el landing = cambiar un HTML y recargar Caddy; no hay build.
+Cambiar el landing = cambiar un HTML y recargar Caddy; no hay build. Los recursos de marca
+(`landing/assets/`) se generan con `tools/marca/generar_marca.py` a partir del logo original: ahí no se
+edita a mano. El emblema se sirve sobre una pastilla crema porque el azul de la marca desaparece en
+modo oscuro, y el logo con el nombre completo no se usa en la cabecera: es un lockup vertical que a
+68 px de alto no se lee.
 
 ## 4. El recorrido de una petición autenticada
 

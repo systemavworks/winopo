@@ -1,4 +1,4 @@
-# Desplegar Winopo
+# Desplegar WinOpo
 
 > Procedimiento real para el servidor de v0. Si algo de aquí no funciona, el documento está mal:
 > se corrige, no se improvisa en el servidor.
@@ -200,6 +200,10 @@ Es HTML estático en `landing/index.html`. **No requiere build ni reinicio de la
 - Está pensado para no necesitar nada más: sin JavaScript, sin fuentes externas, sin cookies, sin
   analítica. Por eso no hay banner de consentimiento (no hay nada que consentir) y la CSP del apex
   bloquea scripts (`script-src 'none'`).
+- La marca va aparte: `landing/assets/` contiene el emblema, el favicon, el icono de iOS y la tarjeta
+  para redes. Salen del logo original con `python3 tools/marca/generar_marca.py`, que recorta, quita el
+  fondo crema y genera cada tamaño. **Si cambia el logo, se regeneran; no se editan a mano.** Suman
+  unos 190 KB, servidos desde el mismo dominio (sin CDN ni terceros).
 
 Detalles que no hay que olvidar al publicarlo:
 
@@ -208,7 +212,10 @@ Detalles que no hay que olvidar al publicarlo:
 2. El correo de contacto es `hola@winopo.es`: hay que crear el buzón o el alias antes de publicar.
 3. Las llamadas a la acción apuntan a `https://app.winopo.es/login`. Si cambia el subdominio, se
    cambia en `landing/index.html` y en `infra/caddy/Caddyfile`.
-4. El aviso legal y la política de privacidad están marcados como "en preparación": es texto honesto,
+4. La tarjeta para redes (`og:image`) apunta a `https://winopo.es/assets/og-winopo.jpg`: **la URL es
+   absoluta a propósito** (los rastreadores de redes no resuelven rutas relativas), así que si el
+   dominio cambia hay que regenerar y ajustar esa línea.
+5. El aviso legal y la política de privacidad están marcados como "en preparación": es texto honesto,
    pero **no se puede lanzar comercialmente sin ellos** (LSSI + RGPD). Pendiente legal (§12).
 
 Ver el landing en local, sin Docker:

@@ -1,4 +1,4 @@
-# Winopo · plan de implementación
+# WinOpo · plan de implementación
 
 **Estado**: borrador de trabajo · **Fecha**: 17-nov-2026 · **Objetivo**: plataforma operativa para 3 preparadores
 antes de septiembre de 2027, empezando a vender módulos en la temporada 2027–2028.

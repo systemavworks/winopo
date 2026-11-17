@@ -1,6 +1,6 @@
 {
-  "name": "Winopo",
-  "short_name": "Winopo",
+  "name": "WinOpo",
+  "short_name": "WinOpo",
   "description": "Preparación de oposiciones con preparador de verdad",
   "start_url": "/",
   "display": "standalone",

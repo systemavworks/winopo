@@ -1,4 +1,4 @@
-# Infraestructura de Winopo
+# Infraestructura de WinOpo
 
 Un servicio + un worker + una base + un bucket. Nada de Kubernetes en v0.
 
@@ -20,7 +20,7 @@ Un servicio + un worker + una base + un bucket. Nada de Kubernetes en v0.
 ## Dónde se despliega
 
 Ver [`docs/infra-servidor.md`](../docs/infra-servidor.md). Resumen: la caja actual es **CAX11 ARM64 de 4 GB** y ya
- aloja Komanda y Billka. Winopo va a **caja propia** (CAX21 recomendada) para no compartir memoria, red interna ni
+ aloja Komanda y Billka. WinOpo va a **caja propia** (CAX21 recomendada) para no compartir memoria, red interna ni
  base de datos con los otros dos productos.
 
 ## Aviso ARM64

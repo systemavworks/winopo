@@ -1,4 +1,4 @@
-# Winopo core · una imagen para API y worker (el perfil lo decide WINOPO_PROFILE)
+# WinOpo core · una imagen para API y worker (el perfil lo decide WINOPO_PROFILE)
 FROM gradle:8.10-jdk21 AS build
 WORKDIR /src
 COPY core/settings.gradle.kts core/build.gradle.kts ./

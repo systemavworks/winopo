@@ -9,7 +9,7 @@ JVM_OBJETIVO := $(shell ls /usr/lib/jvm 2>/dev/null | grep -q '21' && echo 21 ||
 GRADLE := cd core && ./gradlew -PjvmTarget=$(JVM_OBJETIVO)
 
 help:
-> @echo "Winopo · comandos"
+> @echo "WinOpo · comandos"
 > @echo ""
 > @echo "  make dev        Levanta PostgreSQL y Mailpit"
 > @echo "  make up         Stack completo: db + core + worker + web"

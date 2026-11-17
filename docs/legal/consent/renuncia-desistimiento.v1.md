@@ -16,7 +16,7 @@ Sin este consentimiento, la compra tendría 14 días de desistimiento aunque el 
 
 ---
 
-Al contratar, accedes de inmediato al contenido digital de Winopo (temario, tests y correcciones).
+Al contratar, accedes de inmediato al contenido digital de WinOpo (temario, tests y correcciones).
 
 Al marcar esta casilla declaras que:
 

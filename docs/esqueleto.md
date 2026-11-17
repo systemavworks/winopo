@@ -1,4 +1,4 @@
-# Winopo · esqueleto del repositorio
+# WinOpo · esqueleto del repositorio
 
 **Estado**: F0 escrita · 29 pruebas del core en verde, `tsc --noEmit` y `next build` limpios · **Fecha**: 17-nov-2026
 
@@ -45,6 +45,7 @@ winopo/
 │   │   ├── cesion-derechos.md
 │   │   └── rgpd.md
 │   ├── marca/
+│   │   ├── winopo-lockup.png   emblema + nombre + subtítulo (generado, no se sirve)
 │   │   ├── winopo_logo.jpeg
 │   │   └── winopo_logo_es.jpeg
 │   ├── runbooks/
@@ -75,6 +76,7 @@ winopo/
 │   ├── docker-compose.yml
 │   └── README.md
 ├── landing/
+│   ├── assets/             emblema, favicon, icono de iOS y tarjeta de redes (generados)
 │   └── index.html          página pública de winopo.es (HTML estático, sin JS)
 ├── migrations/
 │   ├── 0001_base.sql
@@ -125,6 +127,8 @@ winopo/
 │   ├── tailwind.config.ts
 │   ├── tsconfig.json
 │   └── tsconfig.tsbuildinfo
+├── tools/
+│   └── marca/              script que deriva los activos del landing a partir del logo
 ├── .editorconfig
 ├── .env.example
 ├── .gitignore

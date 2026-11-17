@@ -27,7 +27,8 @@ planificados, no implementados. La hoja de ruta viva está en [`winopo_roadmap.h
 core/        Backend Kotlin + Ktor (API /v1, worker de jobs)
 migrations/  SQL versionado, RLS forzado
 web/         Next.js + TypeScript (app.winopo.es)
-landing/     HTML estático de winopo.es (sin build, sin JS)
+landing/     HTML estático de winopo.es (sin build, sin JS; marca en landing/assets)
+tools/       Utilidades de desarrollo (generación de la marca del landing)
 infra/       Compose local/staging/prod, Caddy
 contracts/   Esquemas JSON compartidos
 tests/e2e/   Playwright

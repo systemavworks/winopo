@@ -9,7 +9,7 @@ export default async function PanelAdmin() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-xl font-semibold text-tinta">Administración de Winopo</h1>
+        <h1 className="text-xl font-semibold text-tinta">Administración de WinOpo</h1>
         <p className="mt-1 text-sm text-slate-600">Sesión {sesion.usuarioId.slice(0, 8)}</p>
       </header>
 

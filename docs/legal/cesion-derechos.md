@@ -4,7 +4,7 @@
 
 ## 1. Qué se cede
 
-El **preparador** sube temario, tests y supuestos. Ese material es suyo. Winopo necesita una licencia para
+El **preparador** sube temario, tests y supuestos. Ese material es suyo. WinOpo necesita una licencia para
  almacenarlo y mostrarlo a sus opositores, no la propiedad.
 
 Por eso la cláusula correcta es una **licencia de uso**, no una cesión:
@@ -18,13 +18,13 @@ Por eso la cláusula correcta es una **licencia de uso**, no una cesión:
 
 ## 2. Qué NO se cede
 
-- Winopo **no** adquiere la propiedad del temario.
-- Winopo **no** puede usar el temario para entrenar modelos.
-- Winopo **no** puede revenderlo a otro preparador.
+- WinOpo **no** adquiere la propiedad del temario.
+- WinOpo **no** puede usar el temario para entrenar modelos.
+- WinOpo **no** puede revenderlo a otro preparador.
 
 ## 3. Material del opositor
 
-Sus entregas son suyas. Se licencian a Winopo y al preparador solo para corregirlas y para el histórico del
+Sus entregas son suyas. Se licencian a WinOpo y al preparador solo para corregirlas y para el histórico del
  propio opositor. Se borran según los plazos de `docs/legal/rgpd.md`.
 
 ## 4. Cláusulas que deben aparecer

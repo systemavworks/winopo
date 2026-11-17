@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://winopo.es'),
-  title: 'Winopo · preparación de oposiciones',
+  metadataBase: new URL('https://app.winopo.es'),
+  title: 'WinOpo · preparación de oposiciones',
   description: 'Temario, tests y supuestos con corrección por rúbrica, para preparadores y opositores.',
   manifest: '/manifest.webmanifest',
   robots: { index: true, follow: true },
@@ -33,7 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </header>
         <main className="mx-auto max-w-5xl px-4 py-10">{children}</main>
         <footer className="mx-auto flex max-w-5xl flex-wrap gap-4 px-4 py-8 text-xs text-slate-500">
-          <span>Winopo · winopo.es</span>
+          <span>WinOpo · winopo.es</span>
           <a href="/legal/aviso-legal" className="hover:text-acento">Aviso legal</a>
           <a href="/legal/privacidad" className="hover:text-acento">Privacidad</a>
         </footer>

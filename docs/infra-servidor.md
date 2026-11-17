@@ -20,7 +20,7 @@ Los datos identificables de la máquina (ID, hostname, IPv4 e IPv6) **no se publ
 
 ### 2.1 Es ARM64
 
-Toda imagen de Winopo tiene que ser **multi-arch** o construirse en la propia máquina. Las que usa el
+Toda imagen de WinOpo tiene que ser **multi-arch** o construirse en la propia máquina. Las que usa el
  esqueleto (`postgres:16-alpine`, `caddy:2-alpine`, `eclipse-temurin:21-jre-alpine`) lo son. Lo que no lo es:
 
 - Librerías nativas: `argon2-jvm` con `.so` de x86. Por eso `Passwords.kt` usa **PBKDF2 del JDK** y no Argon2id.
@@ -29,7 +29,7 @@ Toda imagen de Winopo tiene que ser **multi-arch** o construirse en la propia m�
 
 ### 2.2 4 GB ya están ocupados
 
-Con Komanda y Billka dentro, Winopo **no cabe con holgura**. Presupuesto estimado de Winopo:
+Con Komanda y Billka dentro, WinOpo **no cabe con holgura**. Presupuesto estimado de WinOpo:
 
 | Contenedor | RAM en reposo | RAM con carga |
 |---|---|---|
@@ -45,13 +45,13 @@ Sumado a lo que ya corre, se entra en swap y en OOM killer. Y un OOM killer en p
 
 ## 3. Decisión recomendada
 
-**Caja propia para Winopo.** Es la misma regla que ya aplica Billka con Komanda (ADR `B0002`): runtime, base de
+**Caja propia para WinOpo.** Es la misma regla que ya aplica Billka con Komanda (ADR `B0002`): runtime, base de
  datos y despliegue propios; si comparten máquina, no comparten red interna ni base de datos.
 
 | Opción | Cuándo tiene sentido |
 |---|---|
 | **CAX21** (4 vCPU · 8 GB · 80 GB, ARM) | Recomendada. Margen para worker de IA y vídeo sin ahogar la web |
-| CAX11 (2 vCPU · 4 GB · 40 GB) solo para Winopo | Vale para F0–F2, sin worker pesado. Migrar antes de vender |
+| CAX11 (2 vCPU · 4 GB · 40 GB) solo para WinOpo | Vale para F0–F2, sin worker pesado. Migrar antes de vender |
 | Compartir la caja actual | **No**. Tres productos en 4 GB es pedir un incidente |
 
 Comprobar precio y disponibilidad en el panel antes de decidir: las tarifas cambian.

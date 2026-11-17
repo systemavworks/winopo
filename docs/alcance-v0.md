@@ -1,4 +1,4 @@
-# Winopo · alcance v0
+# WinOpo · alcance v0
 
 **Estado**: borrador de trabajo · **Fecha**: 17-nov-2026 · **Cliente**: 3 formadores · **Nicho**: oposiciones de
 Maestro de Infantil y Primaria, Andalucía · **Dominio**: `winopo.es` (registrado 17-nov-2026)
@@ -92,7 +92,7 @@ Observación de campo (17-nov-2026): muchos preparadores y opositores tienen **e
 El material existe en Word, en escaneos o en fotos; lo que no existe es un documento que se pueda estudiar: portada,
 índice paginado, numeración de epígrafes, tablas que no se salgan de la página.
 
-Winopo lo trata como parte del producto, no como un extra:
+WinOpo lo trata como parte del producto, no como un extra:
 
 | Pieza | Decisión |
 |---|---|

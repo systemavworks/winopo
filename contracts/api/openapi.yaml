@@ -1,6 +1,6 @@
 openapi: 3.0.3
 info:
-  title: Winopo API
+  title: WinOpo API
   version: 0.1.0
   description: |
     REST /v1. Dos caras (preparador y opositor) sobre el mismo backend.

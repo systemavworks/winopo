@@ -7,7 +7,7 @@ export default function Portada() {
       <section className="space-y-5">
         <p className="text-xs font-semibold uppercase tracking-wider text-acento">Oposiciones · corrección con rúbrica</p>
         <h1 className="max-w-2xl text-3xl font-semibold leading-tight text-tinta sm:text-4xl">
-          Tu preparador corrige como siempre. Winopo le quita el trabajo repetitivo.
+          Tu preparador corrige como siempre. WinOpo le quita el trabajo repetitivo.
         </h1>
         <p className="max-w-2xl text-base leading-relaxed text-slate-600">
           Temario, tests corregidos al instante y supuestos prácticos con rúbrica. La IA propone una corrección;

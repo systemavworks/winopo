@@ -1,4 +1,4 @@
-# Winopo web · Next.js en modo standalone
+# WinOpo web · Next.js en modo standalone
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY web/package.json web/package-lock.json* ./

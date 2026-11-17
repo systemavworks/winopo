@@ -1,8 +1,8 @@
-# Marca · Winopo
+# Marca · WinOpo
 
 ## Nombre
 
-**Winopo** — se lee como se escribe, dos sílabas duras y una final abierta. `win` de *win*, `opo` de *oposición*.
+**WinOpo** — se lee como se escribe, dos sílabas duras y una final abierta. `win` de *win*, `opo` de *oposición*.
 
 Riesgo asumido: `win` es inglés y una oposición es española. Funciona porque el público reconoce las dos piezas;
  si en las entrevistas la gente pregunta "¿win?", se cambia. No se cambia por gusto.

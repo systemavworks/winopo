@@ -75,7 +75,7 @@ se da de baja y se da de alta.
 ## D7 · Responsable del tratamiento
 
 **Pendiente de decisión legal**: quién figura como responsable del tratamiento en la política de privacidad
- (¿el preparador, Winopo, o corresponsables?). Afecta al texto RGPD y al contrato de encargo de tratamiento.
+ (¿el preparador, WinOpo, o corresponsables?). Afecta al texto RGPD y al contrato de encargo de tratamiento.
  Ver `docs/legal/rgpd.md`.
 
 ---
