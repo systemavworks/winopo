@@ -1,6 +1,6 @@
 # WinOpo
 
-Plataforma de preparación de oposiciones con **dos espacios**: el preparador publica su temario, sus tests y sus supuestos y corrige a su grupo; el opositor estudia, practica, ensaya el oral y recibe correcciones con **rúbrica explícita** y trazabilidad de quién corrigió. El opositor puede prepararse por su cuenta y vincularse después a un preparador sin perder su historial (D12).
+Plataforma de preparación de oposiciones con **dos espacios**: el preparador publica su temario, sus tests y sus supuestos y corrige a su grupo; el opositor estudia, practica, ensaya el oral y recibe correcciones con **rúbrica explícita** y trazabilidad de quién corrigió. El opositor puede prepararse por su cuenta y vincularse después a un preparador sin perder su historial (D12). Se registra él solo, sin invitación (D16), y contrata su **plan por temporada: Básico, Pro o Master** (D13).
 
 > Código propietario. El repositorio es público para revisión; no se concede licencia de uso ni de redistribución.
 
@@ -20,7 +20,8 @@ planificados, no implementados. La hoja de ruta viva está en [`winopo_roadmap.h
 | F3 | Supuestos con rúbrica | no empezada |
 | F3.5 | Tribunal simulado (oral, informe de conducta) | nueva |
 | F4 | Vídeo y demo | no empezada |
-| F5 | Cobro (preparador y, si se cierra D13, opositor) y alta de preparadores | no empezada |
+| F5 | Cobro en dos circuitos: planes del opositor (Básico/Pro/Master) y preparador por alumno | no empezada |
+| F5.5 | Alta pública: `/registro` con correo verificado y tenant propio | nueva |
 
 ## Estructura
 
@@ -43,7 +44,7 @@ docs/        Alcance, plan, decisiones, marca, legal, runbooks
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | cómo está montado: componentes, multi-tenant, sesión, contrato de API, qué no existe todavía |
 | [`DEPLOY.md`](DEPLOY.md) | desplegar en el servidor: DNS, secretos, migraciones, rollback, copias |
 | [`winopo_roadmap.html`](winopo_roadmap.html) | hoja de ruta viva por fases |
-| [`docs/decisiones.md`](docs/decisiones.md) | D1–D11 y el porqué de cada una |
+| [`docs/decisiones.md`](docs/decisiones.md) | D1–D16 y el porqué de cada una |
 | [`docs/alcance-v0.md`](docs/alcance-v0.md) | qué se vende y qué no |
 
 ## Arrancar en local
@@ -65,8 +66,9 @@ API en `http://localhost:8080`, web en `http://localhost:3000`.
 
 ## Decisiones que conviene leer antes de tocar código
 
-- `docs/decisiones.md` — D1 a D11. Sin contexto de tenant no se ve una fila (RLS forzada); la sesión guarda el
-  hash del token, no el token; la maquetación genera un PDF reproducible y nunca se edita a mano.
+- `docs/decisiones.md` — D1 a D16. Sin contexto de tenant no se ve una fila (RLS forzada); la sesión guarda el
+  hash del token, no el token; la maquetación genera un PDF reproducible y nunca se edita a mano; el opositor es un
+  tenant propio con vinculación opcional y paga su plan (D12, D13, D16).
 - `docs/plan-implementacion.md` — fases, stack y criterios de aceptación.
 - `docs/alcance-v0.md` — qué se vende, qué no, y qué material no se puede alojar.
 

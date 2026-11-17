@@ -82,6 +82,8 @@ Nada de microservicios, ni Kubernetes, ni colas gestionadas en v0: un servicio, 
 | `video` | Derivado del tema | `tema_version_id`, `guion_sha256`, `estado` |
 | `job` | Cola de trabajo | `tipo`, `estado`, `intentos`, `ultimo_error` |
 | `consent` | Consentimientos y renuncia al desistimiento | Fecha, IP, texto versionado |
+| `plan_contratado` | Plan del opositor por temporada | **No existe**: `tenant_id`, `plan` (`basico`/`pro`/`master`), `temporada`, `estado`, `stripe_ref` (D13) |
+| `consumo_plan` | Tope de uso de IA y tribunal | **No existe**: contadores por `tenant_id` y temporada; sin esto el plan Master se vende a pérdida |
 | `audit_log` | Quién hizo qué | Append-only |
 
 Reglas transversales: toda tabla de contenido lleva `tenant_id` y RLS forzado; toda tabla con historial lleva
@@ -166,15 +168,32 @@ es un argumento concreto frente a Opogestión y crea dependencia sana: nadie mig
 - **Aceptación**: un tema pasa a vídeo sin intervención manual; regenerar el vídeo de una versión no borra el
   anterior; la demo caduca sola.
 
-### F5 · Cobro y alta de preparadores — 3 semanas
+### F5 · Cobro y alta de preparadores — 4 semanas
 
-- Stripe Checkout, webhooks idempotentes, facturas, cupones de temporada.
+- **Dos circuitos de Stripe**, no uno: el preparador (B2B, por alumno) y los planes del opositor (B2C).
+- Planes del opositor **Básico / Pro / Master** (D13), por temporada, con subida de nivel sin pagar dos veces lo
+  mismo.
+- Tope de uso por plan (`consumo_plan`): correcciones de IA y ensayos de tribunal. Se comprueba antes de encolar el
+  trabajo, no después de gastarlo.
+- Webhooks idempotentes, facturas, cupones de temporada.
 - Checkout con **clic de renuncia al desistimiento** (art. 103.m TRLGDCU) guardado con fecha, IP y versión del texto.
 - Alta guiada de los 3 preparadores; panel de admin mínimo.
-- Plan del opositor autónomo **solo si se cierra D13**: es un checkout B2C distinto, con sus datos fiscales y su
-  propio soporte.
-- **Aceptación**: compra de prueba de un módulo, factura con IVA correcto, acceso concedido por webhook y no por
-  retorno del navegador; consentimiento recuperable y auditable.
+- **Aceptación**: compra de prueba de un plan del opositor y de una plaza de preparador, factura con IVA correcto en
+  los dos casos, acceso concedido por webhook y no por retorno del navegador; el cuarto ensayo de oral del plan Pro
+  se rechaza con un mensaje claro y no con un error del proveedor; consentimiento recuperable y auditable.
+
+### F5.5 · Alta pública — 1 semana
+
+- `/registro` (D16): correo y clave, verificación por enlace, creación de `tenant` `opositor` + `membership` en una
+  sola transacción.
+- Límite de intentos por IP y por correo, más captcha: el alta abierta es una factura abierta.
+- **Aceptación**: un alta real desde el móvil deja al opositor dentro en menos de dos minutos; el mismo correo no
+  crea dos cuentas; sin correo verificado no se entra; y un intento masivo se frena sin bloquear a un usuario
+  legítimo.
+
+**Total: 24 semanas** de desarrollo (18 originales + 2 de maquetación + 2 de tribunal simulado + 1 de alta pública +
+1 de cobro B2C con planes). Con un solo desarrollador y sin imprevistos, arrancar el 1-dic-2026 lleva a mediados
+de mayo de 2027, con margen hasta septiembre.
 
 **Total: 22 semanas** de desarrollo (18 originales + 2 de maquetación + 2 de tribunal simulado). Con un solo
 desarrollador y sin imprevistos, arrancar el 1-dic-2026 lleva a mediados de mayo de 2027, con margen hasta

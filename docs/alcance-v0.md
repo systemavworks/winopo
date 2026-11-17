@@ -73,10 +73,11 @@ Hay **tres** lecturas cruzadas permitidas, y solo tres:
 El opositor puede vivir toda la vida de la plataforma sin vincularse a nadie. Si se vincula y luego cambia de
 preparador, se cierra una vinculación y se abre otra: el historial es suyo y no se migra al preparador.
 
-## 4. Módulos y comercialización
+## 4. Planes y comercialización
 
-Se venden por **módulo de oposición** y por **temporada** (septiembre–mayo), no por suscripción mensual continua.
-Cada espacio tiene su propia escala, porque cada uno paga lo suyo:
+Se vende por **temporada** (septiembre–mayo), nunca por suscripción mensual continua, y con dos escalas, una por
+espacio. Para no confundir tres cosas en la misma reunión: **bloque** es una parte del temario (una materia), **plan**
+es lo que se contrata y **módulo** es lo que un plan desbloquea.
 
 **Espacio preparador**
 
@@ -87,24 +88,40 @@ Cada espacio tiene su propia escala, porque cada uno paga lo suyo:
 | + Preparador | Corrección humana y tutoría |
 | Curso completo | Todo lo anterior + vídeo |
 
-**Espacio opositor**
+**Espacio opositor — plan propio (D13)**
 
-| Nivel | Incluye |
-|---|---|
-| Base | Temario y apuntes propios maquetados, tests y plan de estudio |
-| + IA | Supuestos con rúbrica y **tribunal simulado** |
-| Vinculado | Lo que publique el preparador al que se vincule; la tutoría, si la hay, se la paga él a su preparador |
-| Curso completo | Base + IA + vídeo de repaso |
+| Plan | Incluye | Coste variable |
+|---|---|---|
+| Básico | Temario y apuntes propios maquetados en PDF, tests con corrección explicada, guías y plan de estudio | Casi nulo |
+| Pro | + supuestos con rúbrica, corrección asistida por IA validable y tribunal simulado | IA + transcripción |
+| Master | + vídeo y animaciones de repaso, simulacro completo y tope de ensayos ampliado | IA + vídeo |
 
-Dos reglas de precio, no una:
+Los nombres («Básico / Pro / Master») son provisionales; la escalera de tres niveles y lo que desbloquea cada uno,
+no. La **vinculación con un preparador no está a la venta**: se incluye en los tres planes, porque el material que
+aporta ya lo paga él.
+
+Tres reglas de precio:
 
 1. **Preparador**: el software no puede pasar del 10 % de lo que factura por alumno. Si cobra 60 €/mes por alumno,
    el módulo no puede costar 6 €/mes.
-2. **Opositor**: el plan individual tiene que salir más barato que **mandar maquetar el temario por fuera** (hoy se
-   cobra 40–90 € por tema, según F2.5). Si no sale más barato, no hay razón para contratarlo.
+2. **Opositor**: el plan Básico tiene que salir más barato que **mandar maquetar el temario por fuera** (hoy se
+   cobran 40–90 € por tema, §7.1). Si no sale más barato, no hay razón para contratarlo.
+3. **Ningún plan con IA sin tope**: Pro y Master llevan un máximo de correcciones y de ensayos de oral por
+   temporada. La IA y el tribunal son las dos piezas con coste variable; sin tope, se venden a pérdida.
 
 Falta el dato real del preparador para fijar tarifas (D9). Cobrar al opositor exige Stripe con cliente final
 persona física (D13), que es un circuito distinto del cobro a una academia.
+
+### 4.1 Cómo entra cada uno
+
+| | Opositor | Preparador |
+|---|---|---|
+| **Alta** | **Registro abierto** (D16): correo verificado y tenant propio creado en la misma transacción | Alta guiada: cesión de derechos firmada y revisión del material |
+| **Paga** | Su plan, por temporada | Por alumno cubierto, según D9 |
+| **Vinculación** | Opcional: enlace o código del preparador, y no depende de él para entrar | Ve a los opositores vinculados, no al resto |
+
+El registro abierto obliga a límite de intentos y captcha: cada cuenta nueva puede empezar a gastar IA el primer
+día, y el que abusa no paga.
 
 ## 5. Reglas de IA (no negociables)
 
@@ -242,12 +259,13 @@ los datos de menores de los opositores. **No es un detalle de redacción.**
 | D1 | ¿El preparador puede ser alumno de otro preparador? | Recomendado: no en v1 (ver D12: el opositor ya es espacio propio) |
 | D6 | Nombre y dominio | **Cerrado**: `winopo.es` (17-nov-2026) |
 | D8 | Vídeo: voz + diapositivas o avatar | Recomendado: voz + diapositivas |
-| D9 | Precio por módulo | Bloqueado: falta el precio actual del preparador |
+| D9 | Precio por módulo y por plan | Bloqueado: falta el precio actual del preparador |
 | D10 | ¿Se cobra el alta del preparador? | Recomendado: no; se cobra por alumno |
 | D12 | ¿El opositor sin preparador tiene espacio propio? | **Cerrado**: sí, tenant `opositor` con vinculación opcional (17-nov-2026) |
-| D13 | ¿Cómo paga el opositor? | Pendiente: Stripe persona física, plan de temporada |
-| D14 | ¿Se vende material dentro de la plataforma? | Pendiente: hoy se produce y se exporta; cobrar exige comisión, facturas y soporte |
+| D13 | ¿Cómo paga el opositor? | **Cerrado**: plan propio por temporada con tres niveles: Básico, Pro y Master (17-nov-2026) |
+| D14 | ¿Se vende material dentro de la plataforma? | **Cerrado**: fuera de v1; pagar un plan no convierte al opositor en vendedor (17-nov-2026) |
 | D15 | Tribunal simulado: ¿voz en directo o audio grabado? | Recomendado: audio grabado + transcripción (más barato y auditable) |
+| D16 | ¿Cómo entra cada uno? | **Cerrado**: registro abierto para el opositor, alta guiada para el preparador (17-nov-2026) |
 
 ## 11. Competencia real
 

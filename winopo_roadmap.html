@@ -88,8 +88,8 @@
       typecheck y build del frontend. Lo que falta es arrancar el stack completo con PostgreSQL real y pasar el E2E.
       Todo lo demás está planificado, no empezado.</p>
     <div class="kpi">
-      <div><div class="n">20</div><div class="l">semanas de desarrollo previstas</div></div>
-      <div><div class="n">8</div><div class="l">fases (F0–F5 + F2.5 + F3.5)</div></div>
+      <div><div class="n">24</div><div class="l">semanas de desarrollo previstas</div></div>
+      <div><div class="n">9</div><div class="l">fases (F0–F5.5 + F2.5 + F3.5)</div></div>
       <div><div class="n">29</div><div class="l">pruebas del core en verde (6 clases)</div></div>
       <div><div class="n">0</div><div class="l">secretos en el repositorio</div></div>
     </div>
@@ -153,9 +153,13 @@
           conducta. Sin nota oficial. <a href="#tribunal">Detalle</a>.</td><td>2</td><td><span class="badge b-violet">nueva</span></td></tr>
         <tr><td><b>F4</b></td><td>Vídeo (voz sintética + diapositivas), atado a la versión del tema, y demo de 3 semanas que caduca sola.</td>
           <td>3</td><td><span class="badge b-todo">no empezada</span></td></tr>
-        <tr><td><b>F5</b></td><td>Cobro con Stripe (preparador y, si se cierra D13, plan del opositor), webhooks idempotentes,
-          facturas, consentimiento de renuncia al desistimiento, alta de los 3 primeros preparadores.</td><td>3</td>
+        <tr><td><b>F5</b></td><td>Cobro con Stripe en dos circuitos: <b>planes del opositor</b> (Básico, Pro, Master) y
+          facturación del preparador por alumno. Webhooks idempotentes, facturas, tope de uso de IA por plan,
+          renuncia al desistimiento y alta guiada de los 3 primeros preparadores.</td><td>4</td>
           <td><span class="badge b-todo">no empezada</span></td></tr>
+        <tr><td><b>F5.5</b></td><td><b>Alta pública</b>: <code>/registro</code> con correo verificado que crea tenant
+          <code>opositor</code> y <code>membership</code> en una transacción, más límite de intentos y captcha.
+          <a href="#registro">Detalle</a>.</td><td>1</td><td><span class="badge b-violet">nueva</span></td></tr>
       </tbody>
     </table>
     <p class="lead" style="margin-top:14px">Con un solo desarrollador y sin imprevistos, arrancar el 1-dic-2026 lleva a finales de
@@ -252,6 +256,31 @@
       informe duro desanima a quien mejora despacio. Por eso puntúa conducta y siempre termina en qué hacer en el
       siguiente ensayo. Y cuesta dinero real por ensayo: va dentro del módulo + IA, nunca por minuto suelto.</div>
   </section>
+  <section id="registro">
+    <h2><span class="dot"></span>Alta pública del opositor (F5.5)</h2>
+    <p class="lead">El opositor se registra solo (D16). Es la diferencia entre un producto que espera a que alguien le
+      dé acceso y uno que se puede contratar un domingo por la noche.</p>
+    <table>
+      <thead><tr><th>Paso</th><th>Qué pasa</th><th>Qué queda guardado</th></tr></thead>
+      <tbody>
+        <tr><td><b>1. Formulario</b></td><td>Correo y clave, nada más. Los datos fiscales se piden al contratar un
+          plan, no al entrar.</td><td><code>app_user</code> sin verificar</td></tr>
+        <tr><td><b>2. Verificación</b></td><td>Enlace de un solo uso al correo. Sin verificar no se accede al
+          espacio.</td><td><code>email_verificado_en</code></td></tr>
+        <tr><td><b>3. Espacio</b></td><td>Se crean su tenant <code>opositor</code> y su <code>membership</code> en la
+          misma transacción.</td><td><code>tenant.tipo = 'opositor'</code></td></tr>
+        <tr><td><b>4. Plan</b></td><td>Sin plan contratado solo ve lo que él sube; los módulos de pago (IA,
+          tribunal, vídeo) se abren al contratar.</td><td><code>plan_contratado</code> por temporada</td></tr>
+      </tbody>
+    </table>
+    <div class="note"><b>Aceptación</b>: un alta completa desde el móvil, con correo real, deja al opositor dentro de
+      su espacio en menos de dos minutos; el mismo correo no puede crear dos cuentas; y un intento masivo desde la
+      misma IP se frena sin bloquear a un usuario legítimo.</div>
+    <div class="note note-warn"><b>Riesgo honesto</b>: el alta abierta es una factura abierta. Cada cuenta nueva puede
+      gastar IA y tribunal desde el primer día, así que captcha, tope de intentos y tope de uso por plan no son
+      «mejoras para después»: entran con el alta. El preparador no tiene alta pública a propósito: son tres, firman
+      cesión de derechos y se revisa lo que publican.</div>
+  </section>
   <section>
     <h2><span class="dot"></span>Decisiones que ya están tomadas</h2>
     <p class="lead">Detalle completo en <code>docs/decisiones.md</code>. Si algo de aquí se cambia, se cambia también allí, en el
@@ -282,10 +311,17 @@
         en ARM64 es una dependencia enorme para el mismo resultado.</td><td><span class="badge b-violet">nueva</span></td></tr>
         <tr><td><b>D12</b></td><td>Dos tipos de tenant: preparador y opositor</td><td>El opositor que prepara por su cuenta
         también es cliente: sin espacio propio no puede existir ni pagar.</td><td><span class="badge b-violet">nueva</span></td></tr>
-        <tr><td><b>D13</b></td><td>Cobro al opositor (B2C)</td><td>Circuito distinto al de la academia: datos fiscales,
-        desistimiento y soporte de reclamaciones.</td><td><span class="badge b-todo">pendiente</span></td></tr>
+        <tr><td><b>D13</b></td><td>Planes del opositor: Básico, Pro y Master</td><td>El opositor paga su propio plan
+        por temporada y cada nivel desbloquea módulos completos. La vinculación con un preparador no se vende:</td>
+        <td><span class="badge b-ok">cerrada</span></td></tr>
+        <tr><td><b>D14</b></td><td>Venta de material entre usuarios</td><td>Fuera de v1: un marketplace exige comisión,
+        disputas y responder por material ajeno. Pagar un plan no convierte a nadie en vendedor.</td>
+        <td><span class="badge b-ok">cerrada</span></td></tr>
         <tr><td><b>D15</b></td><td>Tribunal simulado con audio grabado</td><td>Más barato y auditable que el directo, y no
         castiga a quien tiene mala conexión.</td><td><span class="badge b-violet">nueva</span></td></tr>
+        <tr><td><b>D16</b></td><td>Registro abierto para el opositor, alta guiada para el preparador</td><td>El opositor
+        se da de alta solo; el preparador firma cesión y se le revisa el material antes de publicar.</td>
+        <td><span class="badge b-ok">cerrada</span></td></tr>
       </tbody>
     </table>
   </section>
@@ -301,8 +337,8 @@
         <li>Registrar el repositorio como <b>privado</b> hasta que haya contrato de cesión firmado.</li>
       </ul></div>
       <div class="card"><h4>Antes de cobrar (F5)</h4><ul>
-        <li><b>D9</b> — precio real del preparador por opositor, con al menos un preparador dispuesto a firmarlo.</li>
-        <li><b>D13</b> — decidir si el opositor autónomo paga (Stripe B2C) y con qué plan; afecta a la página de precios y al soporte.</li>
+        <li><b>D9</b> — precio real del preparador por opositor y <b>cifra de cada plan</b> (Básico, Pro, Master), con al menos un preparador dispuesto a firmarlo.</li>
+        <li>Precio del plan del opositor revisado contra «maquetar por fuera»: si el Básico no sale más barato, no se vende.</li>
         <li>Búsqueda en OEPM y EUIPO, clase 41 (formación), sin conflictos.</li>
         <li>Texto de renuncia al desistimiento revisado (art. 103.m TRLGDCU).</li>
         <li>Contrato de cesión de derechos revisado por abogado.</li>
@@ -363,7 +399,7 @@ git ls-files | grep -E '^\.env$|\.pem$|id_rsa' || echo 'sin secretos'</code></pr
       <div class="card"><h4>Producto</h4><ul>
         <li><code>docs/alcance-v0.md</code> — qué es y qué no</li>
         <li><code>docs/plan-implementacion.md</code> — fases y stack</li>
-        <li><code>docs/decisiones.md</code> — D1–D15</li>
+        <li><code>docs/decisiones.md</code> — D1–D16</li>
         <li><code>docs/marca.md</code> — nombre, voz, paleta</li>
       </ul></div>
       <div class="card"><h4>Runbooks</h4><ul>

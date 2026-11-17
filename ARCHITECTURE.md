@@ -206,7 +206,7 @@ el campo se omite.
 |---|---|---|
 | Cloudflare R2 (S3) | PDFs, vídeos, escaneos de temario | nunca se sirve el binario directo: URLs firmadas de corta duración |
 | IA (corrección asistida) | corregir supuestos prácticos | interfaz propia (`CorrectorIA`); el proveedor se cambia sin tocar el dominio; **no** se envían datos personales del opositor, solo el texto del supuesto |
-| Stripe | cobros del preparador y del plan del opositor | dos circuitos separados: academia (B2B) y persona física (B2C, D13); el opositor vinculado no paga al preparador por aquí |
+| Stripe | cobros en dos circuitos: el preparador (B2B, por alumno) y los planes del opositor (B2C: Básico, Pro y Master, D13); el opositor vinculado no paga dos veces el mismo material |
 | WeasyPrint (`maquetador`) | generar PDF desde HTML | contenedor aparte: sus dependencias nativas no contaminan la imagen de `core` (D11) |
 
 Regla general: **ningún servicio externo recibe identificadores internos** (ni `tenant_id` ni `user_id`);
@@ -248,7 +248,7 @@ Enumerado para que nadie asuma que existe:
 `docs/decisiones.md` es la fuente de verdad. Las que afectan a esta arquitectura:
 D1 (una vinculación activa por opositor), D12 (dos tipos de tenant: preparador y opositor), D3 (Kotlin/Ktor),
 D4 (Next.js), D6 (RLS en la base), D7 (responsable del tratamiento, pendiente), D9 (precio, pendiente),
-D10 (PBKDF2), D11 (WeasyPrint en contenedor aparte), D13 (cobro al opositor, pendiente),
+D10 (PBKDF2), D11 (WeasyPrint en contenedor aparte), D13 (planes Básico/Pro/Master del opositor),
 D15 (tribunal simulado con audio grabado).
 
 - Despliegue: [`DEPLOY.md`](DEPLOY.md)

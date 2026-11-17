@@ -137,31 +137,62 @@ enumeradas en `docs/alcance-v0.md` §3.
 
 ---
 
-## D13 · El opositor paga su propio plan
+## D13 · El opositor paga su propio plan: Básico, Pro y Master
 
-**Pendiente**: cómo cobra al opositor persona física (Stripe B2C), con qué periodicidad (temporada, no mes suelto) y
-qué pasa si además está vinculado a un preparador que ya paga por él.
+**Decidido** (17-nov-2026): el opositor contrata un plan propio por temporada, no un pago por uso ni una
+suscripción mensual. Tres niveles, y cada uno desbloquea módulos completos:
 
-**Decidido de momento**: dos circuitos separados. La academia paga por sus alumnos; el opositor autónomo paga su
-plan. Un opositor no paga dos veces por el mismo material: si su preparador ya cubre el módulo, su plan propio se
-limita a lo que el preparador no da (por ejemplo, tribunal simulado).
+| Plan | Qué desbloquea |
+|---|---|
+| **Básico** | Temario y apuntes propios maquetados en PDF, tests con corrección explicada, guías y plan de estudio |
+| **Pro** | Todo lo del Básico + supuestos con rúbrica, corrección asistida por IA y **tribunal simulado** |
+| **Master** | Todo lo del Pro + vídeo y animaciones de repaso, simulacro completo y tope de ensayos ampliado |
+
+Los nombres son provisionales («Básico / Pro / Master» se cambia en una tarde); la escalera de tres niveles y lo
+que desbloquea cada uno, no.
+
+**Lo que no se vende**: la vinculación con un preparador **no es un módulo de pago**. Está disponible en los tres
+planes, porque el material que aporta el preparador ya lo paga él. Si su preparador cubre un módulo, el opositor no
+lo paga dos veces: su plan se queda en lo que el preparador no da.
+
+**Tope de uso por plan**: cada nivel lleva un máximo de correcciones y de ensayos de oral por temporada. La IA y el
+tribunal son las dos piezas con coste variable; sin tope, el plan Master se vende a pérdida. Las cifras se cierran
+con D9.
 
 **Por qué no se puede improvisar**: facturación a consumidor final exige datos fiscales, derecho de desistimiento
-(art. 103.m TRLGDCU ya previsto) y soporte de reclamaciones. No es «el mismo Stripe con otro precio».
+(art. 103.m TRLGDCU) y soporte de reclamaciones. No es «el mismo Stripe con otro precio».
+
+---
+
+## D16 · Registro abierto para el opositor; alta guiada para el preparador
+
+**Decidido** (17-nov-2026): el opositor se registra solo, con su correo y verificación, y el sistema le crea su
+tenant `opositor` con su `membership`. Sin invitación, sin lista de espera y sin tener que pedir acceso.
+
+**Qué implica técnicamente**: una ruta `/registro` que **hoy no existe** (solo hay `/login`), verificación de correo
+obligatoria, creación de `tenant` + `membership` en la misma transacción, y límite de intentos más captcha, porque
+cada cuenta nueva puede gastar dinero en IA desde el primer minuto.
+
+**El preparador no**: entra por alta guiada. Son tres, firman la cesión de derechos antes de subir nada y alguien
+revisa lo que publican. Abrir el alta a cualquiera convierte el catálogo en un vertedero de material copiado y nos
+pone a responder por él.
 
 ---
 
 ## D14 · Venta de material dentro de la plataforma
 
-**Pendiente, y a propósito**: hoy el material se produce y se exporta; comprarlo y venderlo dentro exige comisión,
-facturación al comprador, resolución de disputas y responsabilidad sobre lo que se vende. Antes de abrirlo hay que
-saber quién responde si el material vendido está copiado de una editorial.
+**Decidido** (17-nov-2026): **fuera de v1**. El material se produce y se exporta; no hay escaparate ni cobro entre
+usuarios.
 
-**Decidido de momento**: se cubre la parte que hoy se hace a mano (maquetar, esquematizar, presentar) y se deja la
-transacción fuera. El landing lo dice tal cual: «en estudio», no «próximamente».
+**La confusión que conviene cortar**: D13 (planes Básico/Pro/Master) resuelve cómo **compra** el opositor, no cómo
+**vende**. Que alguien pague un plan no lo convierte en vendedor dentro de la plataforma.
 
-**Por qué importa**: es la diferencia entre un producto que se puede lanzar en F2.5 y un marketplace que necesita un
-equipo legal.
+**Por qué fuera**: vender entre usuarios exige comisión, facturación al comprador, resolución de disputas y
+responsabilidad sobre material ajeno — posiblemente copiado de una editorial—. Es la diferencia entre un producto
+que se puede lanzar en F2.5 y un marketplace que necesita equipo legal.
+
+**Revisable**: si el material de los opositores acaba siendo un atractivo real, se reabre con comisión y contrato
+propio, no de tapadillo.
 
 ---
 
