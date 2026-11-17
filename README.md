@@ -1,4 +1,4 @@
-# Winopo
+# WinOpo
 
 Plataforma de preparación de oposiciones: el preparador publica su temario, sus tests y sus supuestos; sus opositores estudian, practican y reciben correcciones con **rúbrica explícita** y trazabilidad de quién corrigió.
 
