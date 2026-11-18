@@ -1,0 +1,20 @@
+# Override para una caja DEDICADA con IP pública (CAX21), no para la caja compartida.
+#
+#   docker compose --env-file .env -f infra/docker-compose.prod.yml \
+#                  -f infra/docker-compose.caja-propia.yml up -d
+#
+# En la caja compartida este fichero NO se usa: 80/443 son del Caddy de Komanda y el
+# tráfico entra por el túnel. Aquí Caddy sí publica puertos y saca el certificado por
+# HTTP-01, así que los registros DNS tienen que ser A/CNAME en gris (tools/dns-cloudflare.sh --ip).
+services:
+  caddy:
+    environment:
+      WINOPO_SCHEME: https
+    ports: ["80:80", "443:443"]
+    volumes:
+      # Estado de ACME: sin este volumen, cada reinicio vuelve a pedir certificado y
+      # Let's Encrypt empieza a contar duplicados.
+      - caddy-data:/data
+
+volumes:
+  caddy-data:

@@ -1,6 +1,16 @@
 name: winopo
 
-# Producción. Misma imagen que staging; base y secretos propios.
+# Producción en la caja compartida con Komanda (y, cuando se despliegue, la API de Billka).
+#
+# Aislamiento, igual que el runbook de Billka (ADR B0009):
+#   · proyecto Compose propio -> red `winopo_default`; ningún servicio de Komanda está en ella
+#   · base y volumen propios   -> `db` + `prod-db`, sin credenciales cruzadas
+#   · **ningún puerto del host** -> el 80/443 lo ocupa el Caddy de Komanda; aquí no se publica nada
+#   · la entrada es un Cloudflare Tunnel -> cloudflared -> caddy:80 (HTTP, TLS en el edge)
+#
+# Los `mem_limit` suman 2 208 MiB. En una caja con 2 753 MiB disponibles no todos pueden coincidir
+# en su techo: son válvulas anti-fuga, no reservas. Si `available` baja de 800 MiB de forma
+# recurrente, se separa la caja (docs/runbooks/alta-servidor-winopo.md §8).
 services:
   db:
     image: postgres:16-alpine
@@ -11,8 +21,8 @@ services:
     volumes:
       - prod-db:/var/lib/postgresql/data
     restart: unless-stopped
-    # Límites alineados con docs/infra-servidor.md: 4 GB de caja, sin que un pico tumbe al resto.
-    mem_limit: 768m
+    mem_limit: 512m
+    # Sin `ports`: la base solo existe dentro de winopo_default.
 
   core:
     build: { context: .., dockerfile: core/Dockerfile }
@@ -24,7 +34,7 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:?falta SESSION_SECRET}
     depends_on: [db]
     restart: unless-stopped
-    mem_limit: 768m
+    mem_limit: 640m
 
   worker:
     build: { context: .., dockerfile: core/Dockerfile }
@@ -35,7 +45,7 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:?falta SESSION_SECRET}
     depends_on: [db]
     restart: unless-stopped
-    mem_limit: 1g
+    mem_limit: 512m
 
   web:
     build: { context: .., dockerfile: web/Dockerfile }
@@ -44,23 +54,35 @@ services:
       PORT: 3000
     depends_on: [core]
     restart: unless-stopped
-    mem_limit: 384m
+    mem_limit: 320m
 
+  # Enrutador interno: no publica puertos. El único que puede entrar es cloudflared.
   caddy:
     image: caddy:2-alpine
     environment:
       WINOPO_DOMINIO: winopo.es
       WINOPO_APP_DOMINIO: app.winopo.es
-    ports: ["80:80", "443:443"]
+      # TLS lo termina Cloudflare: aquí se habla HTTP dentro de la red del proyecto.
+      WINOPO_SCHEME: ${WINOPO_SCHEME:-http}
+    expose: ["80"]
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       # Landing estático: cambiarlo no requiere reconstruir nada, solo recargar Caddy.
       - ../landing:/srv/landing:ro
-      - caddy-data:/data
     depends_on: [core, web]
+    restart: unless-stopped
+    mem_limit: 96m
+
+  # Entrada del tráfico. El token sale de Cloudflare Zero Trust (túnel `winopo-cax11`), no de aquí.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    environment:
+      # Las comillas importan: `${VAR:?mensaje}` sin comillas rompe el YAML si el mensaje lleva `:`.
+      TUNNEL_TOKEN: "${TUNNEL_TOKEN:?falta TUNNEL_TOKEN, el token del tunel de Cloudflare}"
+    depends_on: [caddy]
     restart: unless-stopped
     mem_limit: 128m
 
 volumes:
   prod-db:
-  caddy-data:

@@ -1,37 +1,47 @@
 #!/usr/bin/env bash
-# Registros DNS de winopo.es en Cloudflare.
+# Registros DNS de winopo.es en Cloudflare. Dos modos:
+#
+#   --tunnel   (el de producción hoy) La entrada es un Cloudflare Tunnel: los CNAME los
+#              crea el propio túnel al declarar los hostnames públicos. Este script solo
+#              borra los restos muertos de Pages y recuerda qué hostnames declarar.
+#
+#   --ip IP    Caja dedicada con IP pública: deja winopo.es y app.winopo.es en A (gris) y
+#              www en CNAME al apex, para que Caddy saque el certificado por HTTP-01.
+#              En naranja habría dos TLS y Cloudflare exigiría un certificado de origen
+#              (Origin CA) o modo "Full (strict)".
 #
 # Simula por defecto: enseña qué cambiaría y no toca nada. Con --apply escribe.
-# Idempotente: dos ejecuciones seguidas con la misma IP no cambian nada la segunda.
+# Idempotente: dos ejecuciones seguidas con el mismo destino no cambian nada la segunda.
 #
-#   tools/dns-cloudflare.sh --ip 203.0.113.10          # simulación (IP de ejemplo, RFC 5737)
-#   tools/dns-cloudflare.sh --ip 203.0.113.10 --apply  # escribe
-#   tools/dns-cloudflare.sh --ip 203.0.113.10 --staging --apply
+#   tools/dns-cloudflare.sh --tunnel                      # simulación del modo túnel
+#   tools/dns-cloudflare.sh --tunnel --apply              # borra restos de Pages
+#   tools/dns-cloudflare.sh --ip 203.0.113.10             # caja propia (IP de ejemplo, RFC 5737)
+#   tools/dns-cloudflare.sh --ip 203.0.113.10 --apply
 #
 # Token: API_TOKEN_CLOUDFLARE en el entorno, o en .env en la raíz del repositorio.
-# Solo necesita Zone.DNS:Edit sobre winopo.es. Nada más (ni Pages, ni cuenta).
-#
-# Los registros se crean en GRIS (proxied=false) a propósito: Caddy termina el TLS y
-# saca el certificado con HTTP-01. En naranja habría dos TLS y Cloudflare exigiría un
-# certificado de origen (Origin CA) o modo "Full (strict)".
+# Solo necesita Zone.DNS:Edit sobre winopo.es. Nada más (ni Pages, ni cuenta): el proyecto
+# de Pages muerto se borra desde el panel, no desde aquí.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 DOMINIO="winopo.es"
 IP=""
+MODO=""            # tunnel | ip. Obligatorio y explícito: el script escribe en el DNS real.
 APLICAR=0
 PROXIED="false"
 CON_STAGING=0
 API="https://api.cloudflare.com/client/v4"
 
+# Ayuda = todas las líneas de comentario entre el shebang y `set -euo pipefail`.
 uso() {
-  sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,/^set -euo pipefail$/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'
   exit "${1:-0}"
 }
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --ip)      IP="${2:-}"; shift 2 ;;
+    --tunnel)  CON_TUNNEL=1; shift ;;
+    --ip)      CON_IP=1; IP="${2:-}"; shift 2 ;;
     --apply)   APLICAR=1; shift ;;
     --proxied) PROXIED="true"; shift ;;
     --staging) CON_STAGING=1; shift ;;
@@ -40,12 +50,29 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-if [ -z "$IP" ]; then
-  echo "Falta --ip. Es la IPv4 de la caja de WinOpo." >&2; uso 1
+# Los dos modos se excluyen; se comprueba después de parsear porque el orden de los
+# argumentos no debe decidir cuál gana.
+if [ "${CON_TUNNEL:-0}" -eq 1 ] && [ "${CON_IP:-0}" -eq 1 ]; then
+  echo "--tunnel y --ip se excluyen: el túnel crea los CNAME, la IP crea los A." >&2; exit 1
 fi
-if ! printf '%s' "$IP" | grep -Eq '^([0-9]{1,3}\.){3}[0-9]{1,3}$'; then
-  echo "--ip no parece una IPv4: $IP" >&2; exit 1
-fi
+if [ "${CON_TUNNEL:-0}" -eq 1 ]; then MODO="tunnel"; fi
+if [ "${CON_IP:-0}" -eq 1 ]; then MODO="ip"; fi
+
+case "$MODO" in
+  tunnel)
+    if [ "$PROXIED" = "true" ]; then echo "--proxied no aplica con --tunnel (el CNAME lo pone Cloudflare)." >&2; exit 1; fi
+    ;;
+  ip)
+    if [ -z "$IP" ]; then echo "Falta la IPv4: --ip <IP>." >&2; uso 1; fi
+    if ! printf '%s' "$IP" | grep -Eq '^([0-9]{1,3}\.){3}[0-9]{1,3}$'; then
+      echo "--ip no parece una IPv4: $IP" >&2; exit 1
+    fi
+    ;;
+  *)
+    echo "Elige modo: --tunnel (caja compartida) o --ip <IPv4> (caja propia)." >&2; uso 1
+    ;;
+esac
+
 
 TOKEN="${API_TOKEN_CLOUDFLARE:-}"
 if [ -z "$TOKEN" ] && [ -f .env ]; then
@@ -78,7 +105,12 @@ if [ -z "$ZID" ]; then
   echo "La zona $DOMINIO no está en esta cuenta." >&2; exit 1
 fi
 
-echo "Zona $DOMINIO ($ZID) · IP $IP · proxied=$PROXIED · modo: $([ "$APLICAR" -eq 1 ] && echo APLICAR || echo SIMULACIÓN)"
+if [ "$MODO" = "ip" ]; then
+  echo "Zona $DOMINIO ($ZID) · modo: caja propia · IP $IP · proxied=$PROXIED"
+else
+  echo "Zona $DOMINIO ($ZID) · modo: túnel (los CNAME los crea Cloudflare Zero Trust)"
+fi
+echo "Ejecución: $([ "$APLICAR" -eq 1 ] && echo APLICAR || echo SIMULACIÓN)"
 echo
 
 # Estado actual, para reconciliar sin depender de cómo esté ahora.
@@ -162,7 +194,7 @@ poner_cname() { # poner_cname NOMBRE DESTINO
 echo "1) Restos de Cloudflare Pages (dan error 1014 y hoy tienen el dominio caído)"
 # El comodín se lleva por delante app., staging., mail. y cualquier subdominio futuro.
 # Se borra solo si apunta a pages.dev: si alguien lo reapunta a mano, no se toca.
-# www no entra aquí: abajo se actualiza a CNAME winopo.es sin borrarlo.
+# www no entra aquí: en modo --ip se reapunta abajo y en modo --tunnel lo trata el paso 2.
 nombre="*.$DOMINIO"
 tipo=$(tipo_actual "$nombre")
 if [ -n "$tipo" ]; then
@@ -177,16 +209,59 @@ if [ -n "$tipo" ]; then
 fi
 echo
 
-echo "2) Dominios del producto (infra/caddy/Caddyfile)"
-poner_a "$DOMINIO"
-poner_cname "www.$DOMINIO" "$DOMINIO"
-poner_a "app.$DOMINIO"
-if [ "$CON_STAGING" -eq 1 ]; then poner_a "staging.$DOMINIO"; fi
+if [ "$MODO" = "ip" ]; then
+  echo "2) Dominios del producto (infra/caddy/Caddyfile)"
+  poner_a "$DOMINIO"
+  poner_cname "www.$DOMINIO" "$DOMINIO"
+  poner_a "app.$DOMINIO"
+  if [ "$CON_STAGING" -eq 1 ]; then poner_a "staging.$DOMINIO"; fi
+else
+  echo "2) Dominios del producto: los crea el túnel, aquí solo se limpian restos"
+  # Lo que el túnel va a necesitar como hostname público. Si el registro existe y apunta
+  # a pages.dev está muerto (error 1014) y estorba: se borra. Si apunta a otra cosa, se deja
+  # y se avisa: puede ser un servicio que alguien montó a mano.
+  for nombre in "$DOMINIO" "www.$DOMINIO" "app.$DOMINIO"; do
+    tipo=$(tipo_actual "$nombre")
+    if [ -z "$tipo" ]; then
+      echo "  $nombre: sin A/CNAME · lo creará el túnel"
+      continue
+    fi
+    contenido=$(registros | jq -r --arg n "$nombre" '[.result[] | select(.name==$n)][0].content')
+    case "$contenido" in
+      *pages.dev*)
+        id=$(existente "$nombre" "$tipo")
+        echo "  $nombre: $tipo -> $contenido (muerto) · se borra para que lo cree el túnel"
+        mutar "borrar $nombre" DELETE "/zones/$ZID/dns_records/$id" ;;
+      *)
+        echo "  $nombre: $tipo -> $contenido · ya existe, no se toca. El túnel reutiliza el hostname" ;;
+    esac
+  done
+  if [ "$CON_STAGING" -eq 1 ]; then
+    echo "  staging.$DOMINIO: añadirlo también como hostname público si hace falta"
+  fi
+fi
 echo
 
 echo "3) Correo: no se toca"
 registros | jq -r '.result[] | select(.type=="TXT" or .type=="MX") | "  \(.name) \(.type) \(.content)"'
 echo
+
+if [ "$MODO" = "tunnel" ]; then
+  cat <<'FIN'
+Lo que este token no puede hacer y hay que hacer en el panel:
+
+  1. Zero Trust → Networks → Tunnels → crear `winopo-cax11` y copiar el token.
+     Ese token es TUNNEL_TOKEN en el .env del servidor.
+  2. En el túnel → Public hostname, tres entradas al mismo servicio:
+       winopo.es      → HTTP  caddy:80
+       www.winopo.es  → HTTP  caddy:80
+       app.winopo.es  → HTTP  caddy:80
+     `caddy` resuelve por la red winopo_default: cloudflared y caddy van en el mismo
+     proyecto Compose. El túnel crea los CNAME en proxied y el apex por CNAME flattening.
+  3. El proyecto Pages muerto no se puede borrar desde aquí (el token no tiene Pages).
+FIN
+  echo
+fi
 
 if [ "$APLICAR" -eq 0 ]; then
   echo "Simulación: no se ha escrito nada. Repetir con --apply para aplicar."
@@ -195,7 +270,16 @@ fi
 
 echo "Estado final en Cloudflare:"
 registros | jq -r '.result[] | "  \(.name) \(.type) \(.content) proxied=\(.proxied)"' | sort
-cat <<'FIN'
+
+if [ "$MODO" = "tunnel" ]; then
+  cat <<'FIN'
+
+Comprobar cuando el túnel esté arriba:
+  dig +short winopo.es @1.1.1.1        # CNAME a <uuid>.cfargotunnel.com (achatado)
+  curl -sI https://winopo.es | head -3  # 200 y `server: cloudflare`
+FIN
+else
+  cat <<'FIN'
 
 Comprobar (la propagación puede tardar; Cloudflare usa TTL automático):
   dig +short winopo.es @1.1.1.1
@@ -203,5 +287,7 @@ Comprobar (la propagación puede tardar; Cloudflare usa TTL automático):
 
 Si los A ya resuelven pero Caddy no saca certificado, el problema es del servidor
 (puerto 80 cerrado, compose caído), no del DNS.
-Ver docs/runbooks/alta-servidor-winopo.md.
 FIN
+fi
+echo
+echo "Detalle y orden de ejecución: docs/runbooks/alta-servidor-winopo.md"

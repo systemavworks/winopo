@@ -1,21 +1,36 @@
-# TLS automático. Dos sitios:
+# TLS: depende de dónde viva esto.
+#   · Caja compartida (hoy): Cloudflare Tunnel termina el TLS y Caddy solo habla HTTP dentro
+#     de la red `winopo_default`. WINOPO_SCHEME=http y el contenedor no publica ningún puerto.
+#   · Caja dedicada con IP pública: WINOPO_SCHEME=https y Caddy saca el certificado por HTTP-01.
+#
+# `X-Forwarded-Proto https` en los tres upstreams: el túnel ya terminó el TLS, pero Caddy
+# recibe HTTP por la red interna y lo reescribiría a `http`. Con el valor correcto, Next.js
+# genera URLs absolutas y cookies `Secure` como es debido.
+#
+# Dos sitios:
 #   winopo.es      -> landing estático (no depende del backend: si core cae, la web comercial sigue)
 #   app.winopo.es  -> plataforma Next.js y API /v1
 #
 # DOMINIO_APP cambia por entorno: app.winopo.es, staging.winopo.es...
-{$WINOPO_APP_DOMINIO:app.winopo.es} {
+{$WINOPO_SCHEME:https}://{$WINOPO_APP_DOMINIO:app.winopo.es} {
 	encode zstd gzip
 
 	handle /v1/* {
-		reverse_proxy core:8080
+		reverse_proxy core:8080 {
+			header_up X-Forwarded-Proto https
+		}
 	}
 
 	handle /healthz {
-		reverse_proxy core:8080
+		reverse_proxy core:8080 {
+			header_up X-Forwarded-Proto https
+		}
 	}
 
 	handle {
-		reverse_proxy web:3000
+		reverse_proxy web:3000 {
+			header_up X-Forwarded-Proto https
+		}
 	}
 
 	header {
@@ -28,7 +43,7 @@
 
 # Apex: solo landing. Las rutas de la aplicación viven en el subdominio.
 # www entra en el mismo bloque: si el DNS lo apunta, tiene que haber certificado para él.
-{$WINOPO_DOMINIO:winopo.es}, www.{$WINOPO_DOMINIO:winopo.es} {
+{$WINOPO_SCHEME:https}://{$WINOPO_DOMINIO:winopo.es}, {$WINOPO_SCHEME:https}://www.{$WINOPO_DOMINIO:winopo.es} {
 	encode zstd gzip
 
 	# Quien escriba a mano winopo.es/login acaba donde tiene que acabar.

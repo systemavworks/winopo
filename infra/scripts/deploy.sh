@@ -2,14 +2,25 @@
 # Despliegue: staging y producción separados, bases distintas, misma imagen.
 # Se ejecuta DESDE CUALQUIER SITIO; el script se coloca en la raíz del repositorio.
 # El .env del servidor no está en git: vive aquí al lado con permisos 600.
+#
+# Producción vive en la caja compartida con Komanda: el tráfico entra por Cloudflare
+# Tunnel y este stack NO publica puertos (ver docs/runbooks/alta-servidor-winopo.md).
+# Con WINOPO_EDGE=propia se añade el override de caja dedicada (80/443 + ACME).
 set -euo pipefail
 
 ENTORNO="${1:-}"
 case "${ENTORNO}" in
-  staging) COMPOSE_FILE="infra/docker-compose.staging.yml" ;;
-  prod)    COMPOSE_FILE="infra/docker-compose.prod.yml" ;;
-  *) echo "uso: deploy.sh staging|prod"; exit 1 ;;
+  staging) COMPOSE_FILES=(-f infra/docker-compose.staging.yml) ;;
+  prod)    COMPOSE_FILES=(-f infra/docker-compose.prod.yml) ;;
+  *) echo "uso: deploy.sh staging|prod  [WINOPO_EDGE=propia]"; exit 1 ;;
 esac
+
+if [ "${WINOPO_EDGE:-compartida}" = "propia" ]; then
+  if [ "$ENTORNO" != "prod" ]; then
+    echo "WINOPO_EDGE=propia solo tiene sentido con prod." >&2; exit 1
+  fi
+  COMPOSE_FILES+=(-f infra/docker-compose.caja-propia.yml)
+fi
 
 cd "$(dirname "$0")/../.."
 
@@ -26,7 +37,25 @@ set +a
 
 : "${POSTGRES_APP_PASSWORD:?falta POSTGRES_APP_PASSWORD en .env}"
 
-COMPOSE=(docker compose --env-file .env -f "${COMPOSE_FILE}")
+# Sin token del túnel, cloudflared arranca y muere en bucle: el stack quedaría arriba pero
+# inalcanzable. Se comprueba antes de construir nada.
+if [ "$ENTORNO" = "prod" ] && [ "${WINOPO_EDGE:-compartida}" != "propia" ]; then
+  : "${TUNNEL_TOKEN:?falta TUNNEL_TOKEN en .env (token del túnel de Cloudflare Zero Trust)}"
+fi
+
+# Staging publica 80/443. En la caja compartida eso es el Caddy de Komanda: abortar antes
+# de intentarlo es más barato que explicar por qué se cayó Komanda.
+if [ "$ENTORNO" = "staging" ]; then
+  for puerto in 80 443; do
+    if ss -ltn "sport = :$puerto" 2>/dev/null | grep -q LISTEN; then
+      echo "El puerto $puerto está ocupado: staging publica 80/443 y aquí eso tumba Komanda." >&2
+      echo "Staging va en el portátil o en una caja propia." >&2
+      exit 1
+    fi
+  done
+fi
+
+COMPOSE=(docker compose --env-file .env "${COMPOSE_FILES[@]}")
 
 echo "==> 1/5 Construyendo imágenes (código actual del directorio de trabajo)"
 "${COMPOSE[@]}" build --pull
@@ -67,3 +96,15 @@ echo "==> 4/5 Levantando servicios"
 echo "==> 5/5 Estado"
 "${COMPOSE[@]}" ps
 
+# En la caja compartida no hay puerto publicado: se comprueba por dentro de la red, que es
+# exactamente el camino que usa el túnel (cloudflared -> caddy:80 -> core:8080).
+if [ "$ENTORNO" = "prod" ] && [ "${WINOPO_EDGE:-compartida}" != "propia" ]; then
+  if "${COMPOSE[@]}" exec -T caddy wget -qO- -T 5 http://127.0.0.1/healthz >/dev/null 2>&1; then
+    echo "    caddy -> core /healthz: 200"
+  else
+    echo "    AVISO: /healthz no responde a través de caddy." >&2
+    echo "    Mira: docker compose --env-file .env ${COMPOSE_FILES[*]} logs --tail=30 core" >&2
+  fi
+  echo "    último log del túnel:"
+  "${COMPOSE[@]}" logs --tail=5 cloudflared 2>/dev/null || true
+fi

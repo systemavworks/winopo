@@ -14,43 +14,60 @@
 
 El despliegue es **manual por SSH** con un script. El workflow **Desplegar** (`.github/workflows/deploy.yml`)
 lo lanza desde GitHub, pero solo cuando se le da a *Run workflow*: no despliega en cada push.
-Cinco contenedores: `db`, `core`, `worker`, `web`, `caddy`. La misma imagen de `core` sirve los dos perfiles.
+Seis contenedores: `db`, `core`, `worker`, `web`, `caddy` y `cloudflared`. La misma imagen de `core` sirve
+los dos perfiles.
+
+Producción vive **en la caja compartida con Komanda** y el tráfico entra por Cloudflare Tunnel: este stack
+no publica ningún puerto. El porqué y el aislamiento están en
+[`docs/runbooks/alta-servidor-winopo.md`](docs/runbooks/alta-servidor-winopo.md) §0.
 
 ## 1. Antes del primer despliegue
 
 ### Servidor
 
-- Un VPS con 4 GB de RAM y 2 vCPU (tipo CAX11 en Hetzner) sobra para v0. Capacidad y límites por
-  contenedor en `docs/infra-servidor.md`; los datos concretos del servidor **no están en el repositorio**.
-- Debian 12 o Ubuntu 24.04, actualizado.
-- Docker Engine + plugin `docker compose` (v2).
-- Reloj en hora (`timedatectl`): un desfase rompe TLS y las fechas de sesión.
+- La caja ya existe: CAX11 ARM64 de 4 GB, compartida con Komanda (medido: 2 753 MiB disponibles, 27 G
+  libres). Criterios de corte y cuándo se separa, en `docs/runbooks/alta-servidor-winopo.md` §0 y §8.
+  Los datos concretos del servidor **no están en el repositorio**.
+- Docker Engine + plugin `docker compose` (v2) ya están instalados: los usa Komanda.
+- Reloj en hora (`timedatectl`): un desfase rompe las fechas de sesión.
 
 ### Red
 
+**No se abre nada nuevo.** El 80/443 son del Caddy de Komanda y `ufw`/`fail2ban` ya están configurados por
+él; reconfigurarlos es la forma más rápida de dejar Komanda sin acceso. Lo único que hay que comprobar:
+
 ```bash
-# Solo estos puertos al exterior. 5432, 8080 y 3000 no se publican nunca en producción.
-ufw allow OpenSSH
-ufw allow 80/tcp
-ufw allow 443/tcp
-ufw enable
+sudo ufw status verbose          # 22, 80, 443 — sin cambios
+docker compose --env-file .env -f infra/docker-compose.prod.yml ps   # ningún puerto en 0.0.0.0
 ```
 
-Comprobar que `docker-compose.prod.yml` no publica puertos de base ni de API: es a propósito.
-Si alguna vez hace falta mirar la base desde fuera, se usa un túnel SSH (`ssh -L 5432:localhost:5432`),
-no se abre el puerto.
+`docker-compose.prod.yml` no publica puertos de base, API ni web: es a propósito. `cloudflared` sale a
+Internet por su cuenta (conexión saliente al edge), así que no hace falta agujero de entrada.
+Si alguna vez hace falta mirar la base desde fuera, se usa un túnel SSH, no se abre el puerto.
+
+En una **caja dedicada** (ver §10 y el override `docker-compose.caja-propia.yml`) sí se abren 22, 80 y 443,
+porque Caddy saca el certificado por HTTP-01.
 
 ### DNS
 
-Los registros se aplican con un script idempotente, no a mano en el panel:
+Los registros se aplican con un script idempotente, no a mano en el panel. En la caja compartida el modo es
+**túnel**: los CNAME los crea el propio túnel al declarar los hostnames públicos, y el script solo limpia
+los restos muertos de Pages.
 
 ```bash
-tools/dns-cloudflare.sh --ip <IP_DE_LA_CAJA>          # simulación: enseña qué cambiaría
-tools/dns-cloudflare.sh --ip <IP_DE_LA_CAJA> --apply  # escribe en Cloudflare
+tools/dns-cloudflare.sh --tunnel            # simulación: enseña qué borraría
+tools/dns-cloudflare.sh --tunnel --apply    # borra `*.winopo.es` y `www` si apuntan a pages.dev
 ```
 
-En el registrador (o en Cloudflare, con los registros en gris si se quiere que Caddy gestione el
-certificado; en naranja solo si el modo SSL es "Full strict"):
+Hostnames públicos a declarar en Zero Trust → Tunnels → `winopo-cax11` (los tres al servicio
+`HTTP caddy:80`): `winopo.es`, `www.winopo.es`, `app.winopo.es`.
+
+El script borra además los restos de Cloudflare Pages: `*.winopo.es` y `www` apuntaban a
+`winopo.pages.dev`, un proyecto que ya no existe, y Cloudflare respondía `error code: 1014` en todo
+subdominio. No toca el `TXT` del SPF ni los `MX`.
+
+Con **IP propia** el modo es el otro, y deja registros en gris (Cloudflare no proxifica: Caddy gestiona el
+certificado por HTTP-01; en naranja solo tendría sentido con modo SSL "Full strict" y Origin CA):
 
 | Nombre | Tipo | Valor |
 |---|---|---|
@@ -59,22 +76,20 @@ certificado; en naranja solo si el modo SSL es "Full strict"):
 | `app.winopo.es` | A | IP del servidor |
 | `staging.winopo.es` | A | IP del servidor (o de otro, si se separa) |
 
-El apex **no puede ser CNAME** (regla del DNS). Por eso `winopo.es` es un registro `A`.
-El script borra además los restos de Cloudflare Pages: `*.winopo.es` y `www` apuntaban a
-`winopo.pages.dev`, un proyecto que ya no existe, y Cloudflare respondía `error code: 1014` en todo
-subdominio. No toca el `TXT` del SPF ni los `MX`.
+El apex **no puede ser CNAME** sin *flattening*: por eso en modo IP es un registro `A` y en modo túnel lo
+achata Cloudflare.
 
-Pasos completos, con el orden correcto (endurecer la caja → DNS → secretos → despliegue):
+Pasos completos, con el orden correcto (host → túnel → DNS → secretos → despliegue):
 [`docs/runbooks/alta-servidor-winopo.md`](docs/runbooks/alta-servidor-winopo.md).
-Comprobar antes de desplegar, porque Let's Encrypt necesita resolver ya:
+Comprobar antes de desplegar:
 
 ```bash
 dig +short winopo.es
 dig +short app.winopo.es
 ```
 
-Si el DNS no resuelve, Caddy no obtiene certificado y el despliegue parece "roto" cuando solo está
-impaciente.
+En modo túnel, hasta que `cloudflared` esté conectado el dominio responde `error 1033`: es lo esperado, no
+un fallo del DNS.
 
 ## 2. Secretos
 
@@ -298,13 +313,21 @@ a medias y descubrir el problema con un opositor delante.
 
 ## 10. TLS y certificados
 
-- Caddy obtiene y renueva certificados de Let's Encrypt automáticamente, por HTTP-01 (puerto 80).
-- Los certificados se guardan en el volumen `caddy-data`. **Ese volumen no se borra** con un `down -v`
-  accidental sin asumir el coste: Let's Encrypt limita los certificados duplicados por semana.
-- HSTS está activado un año con `includeSubDomains`: cuando se sirva por HTTPS, no hay vuelta atrás
-  cómoda a HTTP. Antes de activar un subdominio nuevo, comprobar que también tendrá TLS.
-- Renovación: no hay que hacer nada; si un día falla, el aviso llega 30 días antes del vencimiento en
-  el log de Caddy.
+**En la caja compartida no hay certificados que gestionar.** Cloudflare termina el TLS en su edge y habla
+con `cloudflared` por un canal cifrado; `cloudflared` reenvía a `caddy:80` en claro dentro de la red
+`winopo_default`. Por eso el compose fija `WINOPO_SCHEME=http`, Caddy no publica puertos y no hay
+`caddy-data`: ni ACME, ni Origin CA, ni modo "Full (strict)", ni puerto 80 abierto al mundo.
+
+- HSTS lo pone Caddy y llega al navegador a través del edge: un año con `includeSubDomains`. No hay vuelta
+  atrás cómoda a HTTP, así que antes de publicar un subdominio nuevo hay que comprobar que también tendrá TLS.
+- El certificado del borde se renueva solo; si un día falla, se ve en el panel de Cloudflare, no en los logs
+  del servidor.
+
+**En una caja dedicada** (`WINOPO_EDGE=propia` + `docker-compose.caja-propia.yml`) el esquema es el clásico:
+Caddy obtiene y renueva certificados de Let's Encrypt por HTTP-01 (puerto 80) y los guarda en el volumen
+`caddy-data`. **Ese volumen no se borra** con un `down -v` accidental sin asumir el coste: Let's Encrypt
+limita los certificados duplicados por semana.
+
 
 ## 11. Lo que **no** está automatizado
 

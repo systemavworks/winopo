@@ -11,7 +11,7 @@
 | RAM | 4 GB |
 | Disco | 40 GB local |
 | Región | UE (Falkenstein) |
-| Aloja además | otros dos productos del mismo titular |
+| Aloja además | Komanda (publicado, en `/opt/komanda`). La API de Billka está prevista en esta caja pero **aún no desplegada**: su dashboard vive en Cloudflare Workers |
 
 Los datos identificables de la máquina (ID, hostname, IPv4 e IPv6) **no se publican**: están en
  `privado/infra-real.md`, fuera de git. Un repositorio público con la IP del servidor es un objetivo regalado.
@@ -27,9 +27,9 @@ Toda imagen de WinOpo tiene que ser **multi-arch** o construirse en la propia m�
   En una caja ARM64 sin artefacto nativo, Argon2 conlleva compilar o cambiar de librería: no es gratis.
 - Imágenes de proveedores de TTS o de render de vídeo, si se empaquetan en local: hay que revisarlas una a una.
 
-### 2.2 4 GB ya están ocupados
+### 2.2 Cuánta RAM hace falta
 
-Con Komanda y Billka dentro, WinOpo **no cabe con holgura**. Presupuesto estimado de WinOpo:
+Presupuesto estimado de WinOpo:
 
 | Contenedor | RAM en reposo | RAM con carga |
 |---|---|---|
@@ -37,24 +37,38 @@ Con Komanda y Billka dentro, WinOpo **no cabe con holgura**. Presupuesto estimad
 | `worker` (JVM) | 250–400 MB | 600–900 MB (IA y vídeo) |
 | `db` (PostgreSQL 16) | 150–250 MB | 400–600 MB |
 | `web` (Next.js standalone) | 120–200 MB | 250–350 MB |
-| `caddy` | 20–30 MB | 50 MB |
+| `caddy` (edge interno) | 20–30 MB | 50 MB |
+| `cloudflared` (túnel) | 20–30 MB | 50 MB |
 | **Total** | **~0,8 GB** | **~2,2 GB** |
 
-Sumado a lo que ya corre, se entra en swap y en OOM killer. Y un OOM killer en producción no avisa: mata el
- proceso que elija.
+Medido el 18-nov-2026, la caja **no** estaba ocupada: Komanda (caddy + core + web + postgres) suma ≈ 380 MiB
+y quedan 2 753 MiB disponibles con 27 G de disco libres. Los techos de arriba (2,2 GB) solo se alcanzarían con
+todo a plena carga a la vez, escenario que en v0 no existe; aun así son válvulas anti-fuga, no reservas.
 
-## 3. Decisión recomendada
+## 3. Decisión: compartir la caja, aislado
 
-**Caja propia para WinOpo.** Es la misma regla que ya aplica Billka con Komanda (ADR `B0002`): runtime, base de
- datos y despliegue propios; si comparten máquina, no comparten red interna ni base de datos.
+Igual que Billka con Komanda (ADR `B0009`): **misma máquina, runtime y datos separados**. WinOpo es el tercer
+producto, así que las reglas son más estrictas, no menos:
+
+| Recurso | WinOpo |
+|---|---|
+| Proyecto Compose | `winopo` → red `winopo_default`, sin servicios de Komanda |
+| Base de datos | contenedor propio + volumen `winopo_prod-db`; ningún usuario ni base compartidos |
+| Puertos | **ninguno publicado**: entra `cloudflared` a `caddy:80` por la red interna |
+| Secretos | `.env` propio, 600, sin credenciales cruzadas |
 
 | Opción | Cuándo tiene sentido |
 |---|---|
-| **CAX21** (4 vCPU · 8 GB · 80 GB, ARM) | Recomendada. Margen para worker de IA y vídeo sin ahogar la web |
-| CAX11 (2 vCPU · 4 GB · 40 GB) solo para WinOpo | Vale para F0–F2, sin worker pesado. Migrar antes de vender |
-| Compartir la caja actual | **No**. Tres productos en 4 GB es pedir un incidente |
+| **Compartir el CAX11** (elegida) | hoy: 2 753 MiB disponibles y Komanda en 380 MiB. Coste incremental ~0 € |
+| **CAX21** (4 vCPU · 8 GB · 80 GB, ARM) | cuando se cumpla un disparador del §8 del runbook: `available` < 800 MiB recurrente, disco > 70 %, primer cliente de pago, o necesidad de ventanas de mantenimiento propias |
+
+El 80/443 de la caja es del Caddy de Komanda: un segundo edge publicando esos puertos deja **los dos**
+productos caídos. Por eso la entrada es un Cloudflare Tunnel (`cloudflared` → `caddy:80`, TLS en el edge) y
+no hay certificado que gestionar. El camino de vuelta a caja propia es
+`WINOPO_EDGE=propia` + `docker-compose.caja-propia.yml` + registros `A` en gris.
 
 Comprobar precio y disponibilidad en el panel antes de decidir: las tarifas cambian.
+
 
 ## 4. Antes de decidir, medir (en la caja actual)
 
@@ -69,7 +83,8 @@ Si `free -h` muestra menos de 800 MB disponibles y ya hay swap en uso, el debate
 
 ## 5. Red y seguridad mínimas
 
-- **Firewall del panel**: 22, 80, 443. Nada más. PostgreSQL y el core **no** se publican a Internet.
+- **Firewall**: en la caja compartida no se añade nada (22/80/443 ya los usa Komanda) y `ufw`/`fail2ban` no se
+  reconfiguran. En una caja dedicada: 22, 80, 443 y nada más. PostgreSQL y el core **no** se publican nunca.
 - En el compose, `db` sin `ports:`; solo accesible por la red interna de Docker.
 - SSH con clave, sin contraseña, y `fail2ban` si no está.
 - Copias **fuera** de la caja (`infra/scripts/backup.sh` con `BACKUP_DESTINO` remoto): un disco que se pierde se
@@ -78,14 +93,18 @@ Si `free -h` muestra menos de 800 MB disponibles y ya hay swap en uso, el debate
 
 ## 6. Dominios
 
-| Dominio | Sirve | Certificado |
+| Dominio | Sirve | Cómo llega |
 |---|---|---|
-| `winopo.es` + `www` | landing estático (`landing/`) | Caddy / Let's Encrypt |
-| `app.winopo.es` | plataforma (Next.js) y API `/v1` | Caddy / Let's Encrypt |
-| `staging.winopo.es` | entorno de pruebas (un solo dominio) | Caddy / Let's Encrypt |
+| `winopo.es` + `www` | landing estático (`landing/`) | Cloudflare Tunnel → `caddy:80` |
+| `app.winopo.es` | plataforma (Next.js) y API `/v1` | Cloudflare Tunnel → `caddy:80` |
+| `staging.winopo.es` | entorno de pruebas (un solo dominio) | **No** en esta caja: publica 80/443 |
 
-Los tres apuntan a la misma máquina con registros `A`; el apex no admite `CNAME`. Caddy enruta por
-nombre de host (`infra/caddy/Caddyfile`), así que los certificados son independientes entre sí.
+Los hostnames públicos los declara el túnel y él crea los CNAME (proxied); el apex funciona por *CNAME
+flattening*. Caddy enruta por nombre de host dentro de la red (`infra/caddy/Caddyfile`), así que el
+enrutado del túnel es el mismo para los tres: `HTTP caddy:80`.
+
+En caja dedicada el esquema cambia a registros `A` en gris y certificado de Caddy por HTTP-01, con
+`tools/dns-cloudflare.sh --ip <IP>`.
 
 El apex se sirve como archivos estáticos: si `core` o `web` se caen, la web comercial sigue en pie.
 Detalle del despliegue en [`../DEPLOY.md`](../DEPLOY.md).
