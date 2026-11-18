@@ -179,16 +179,16 @@ Si el token se filtra: rotarlo en el panel y actualizar `.env`, y recrear solo e
 (`docker compose --env-file .env -f infra/docker-compose.prod.yml up -d cloudflared`).
 No se guarda en git ni se pega en un chat.
 
-Si hay que reinstalar y el token no está a mano, se vuelve a pedir a la API sin tocar el panel: basta
-`Cloudflare Tunnel: Read`, que es lo que sí tiene el token del repositorio. Devuelve una sola cadena de
-240 caracteres que empieza por `eyJ`; si sale un JSON o un mensaje de error, no es el token:
+Si hay que reinstalar y el token no está a mano, donde se vuelve a ver es el panel: Zero Trust →
+Networks → Tunnels → `winopo-cax11` → **Configure**, y en el bloque del conector está el `--token eyJ…`.
+Por API **no** se puede con el token del repositorio: `GET /accounts/<cuenta>/cfd_tunnel/<uuid>/token`
+responde `1001 Not authorized`, porque leer el token del conector exige `Cloudflare Tunnel → Edit`, que
+se dejó fuera a propósito. Con un token que sí lo tenga, ese `GET` devuelve una sola cadena de 240
+caracteres que empieza por `eyJ`; si sale `null` o un error, no es el token.
 
-```bash
-set -a; . ./.env; set +a
-curl -sS -H "Authorization: Bearer $API_TOKEN_CLOUDFLARE" \
-  "https://api.cloudflare.com/client/v4/accounts/85acbbc7a2dbb26ec060129fab495c2f/cfd_tunnel/b2690a74-b65b-4909-9f4b-82ad29b7693c/token" \
-  | jq -r '.result' | wc -c          # 241: los 240 caracteres + el salto de línea
-```
+Por eso, además del `.env` del servidor (con su copia `.env.bak-…` al lado), conviene tener el
+`TUNNEL_TOKEN` en el gestor de contraseñas del equipo: es el único valor del despliegue que no se puede
+reconstruir sin entrar al panel.
 
 En `/opt/winopo/.env` van **solo esas cuatro claves** (`POSTGRES_PASSWORD`, `POSTGRES_APP_PASSWORD`,
 `SESSION_SECRET`, `TUNNEL_TOKEN`): el resto —dominios, `APP_ENV=prod`, `DATABASE_URL`— lo pone el
@@ -386,6 +386,7 @@ los registros con `tools/dns-cloudflare.sh --ip <nueva IP>` y se borran los host
 | Síntoma | Dónde mirar | Causa típica |
 |---|---|---|
 | `error 1033` (túnel sin conexión) | `logs cloudflared` | token inválido o `cloudflared` caído |
+| `GET /cfd_tunnel/<id>/token` devuelve `null` o `1001` | el token usado | leer el token del conector exige `Tunnel → Edit`, que no tenemos: se copia del panel (§3) |
 | `error 1014` en un subdominio | DNS | quedó un CNAME a `*.pages.dev` en ese nombre; repetir §4 |
 | `winopo.es` sirve el landing viejo | `tools/deploy-landing.sh --check` | falta desplegar: `make landing-deploy`, o el workflow «landing» falló |
 | `winopo.es` sin HSTS ni CSP | `landing/_headers` | el fichero falta o el último deploy no lo subió (`wrangler deploy`) |
