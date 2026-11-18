@@ -62,6 +62,19 @@ echo "==> 1/5 Construyendo imágenes (código actual del directorio de trabajo)"
 
 echo "==> 2/5 Base de datos y rol de aplicación"
 "${COMPOSE[@]}" up -d db
+# `up -d` vuelve en cuanto el contenedor arranca, no cuando Postgres acepta conexiones: sin
+# esta espera el primer despliegue muere con «No such file or directory» en el socket.
+for intento in $(seq 1 30); do
+  if "${COMPOSE[@]}" exec -T db pg_isready -U winopo -d winopo >/dev/null 2>&1; then
+    break
+  fi
+  if [ "$intento" -eq 30 ]; then
+    echo "Postgres no acepta conexiones tras 60 s: no se sigue." >&2
+    "${COMPOSE[@]}" logs --tail=20 db >&2 || true
+    exit 1
+  fi
+  sleep 2
+done
 # El rol de aplicación se crea aquí y no en una migración: una migración con CREATE ROLE
 # ... PASSWORD acaba metiendo credenciales en el repositorio. Sin BYPASSRLS y sin superusuario:
 # es lo que hace que la RLS proteja de verdad.
