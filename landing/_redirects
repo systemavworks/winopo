@@ -1,0 +1,9 @@
+# Quien escriba a mano winopo.es/login acaba donde tiene que acabar. Antes lo hacía Caddy
+# (infra/caddy/Caddyfile) porque el apex y la plataforma estaban en el mismo servidor; ahora el
+# landing es un Worker y las rutas de la aplicación viven en app.winopo.es.
+/login    https://app.winopo.es/login    301
+/login/*  https://app.winopo.es/login/:splat  301
+/app      https://app.winopo.es/app      301
+/app/*    https://app.winopo.es/app/:splat    301
+/v1       https://app.winopo.es/v1       301
+/v1/*     https://app.winopo.es/v1/:splat     301

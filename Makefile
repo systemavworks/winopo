@@ -1,6 +1,6 @@
 .RECIPEPREFIX = >
 .DEFAULT_GOAL := help
-.PHONY: help dev up down logs psql migrate seed build test test-db web-dev web-build landing e2e tree clean
+.PHONY: help dev up down logs psql migrate seed build test test-db web-dev web-build landing landing-deploy landing-check e2e tree clean
 
 COMPOSE := docker compose $(if $(wildcard .env),--env-file .env,) -p winopo -f infra/docker-compose.yml
 
@@ -24,6 +24,8 @@ help:
 > @echo "  make web-dev    Next.js en modo desarrollo"
 > @echo "  make web-build  Build de produccion del frontend"
 > @echo "  make landing    Sirve el landing de winopo.es en http://localhost:4000"
+> @echo "  make landing-deploy  Publica landing/ en el Worker de Cloudflare (winopo.es)"
+> @echo "  make landing-check   Comprueba que winopo.es sirve lo del repositorio"
 > @echo "  make e2e        Pruebas de extremo a extremo (Playwright)"
 > @echo "  make tree       Arbol resumido"
 > @echo "  make clean      Borra artefactos"
@@ -83,10 +85,19 @@ web-dev:
 web-build:
 > cd web && npm run build
 
-# El landing es HTML estático: se sirve con cualquier servidor. En producción lo sirve Caddy.
+# El landing es HTML estático: se sirve con cualquier servidor. En producción lo sirve el Worker
+# de Cloudflare «winopo» (wrangler.jsonc), no este servidor.
 landing:
 > @echo "Landing en http://localhost:4000 (Ctrl+C para parar)"
 > cd landing && python3 -m http.server 4000
+
+# Publicación real: assets estáticos a Cloudflare, sin pasar por el servidor.
+# En CI lo hace el workflow «landing»; en local necesita CLOUDFLARE_API_TOKEN en el entorno.
+landing-deploy:
+> ./tools/deploy-landing.sh
+
+landing-check:
+> ./tools/deploy-landing.sh --check
 
 e2e:
 > cd tests/e2e && npx playwright test

@@ -1,0 +1,11 @@
+# Cabeceras del landing, equivalentes a las que ponía Caddy en el bloque del apex
+# (infra/caddy/Caddyfile). Cloudflare las aplica al servir los assets estáticos.
+#
+# El landing no usa cookies ni scripts de terceros: no hay banner de consentimiento que
+# mostrar y la CSP puede bloquear scripts por completo.
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: SAMEORIGIN
+  Referrer-Policy: strict-origin-when-cross-origin
+  Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'none'; form-action 'self'; frame-ancestors 'self'

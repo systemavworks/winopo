@@ -1,0 +1,50 @@
+name: landing
+
+# Publica la landing estática (./landing) en el Worker de Cloudflare «winopo» cuando cambia algo de
+# la web comercial. La landing NO se sirve desde el servidor: es un Worker con assets estáticos
+# (wrangler.jsonc, dominios winopo.es y www.winopo.es con `custom_domain`) y su único camino de
+# publicación es este job o ./tools/deploy-landing.sh.
+#
+# Necesita el secreto CLOUDFLARE_API_TOKEN (plantilla «Edit Cloudflare Workers», con Workers
+# Scripts: Edit y Workers Routes: Edit sobre la zona winopo.es) y, opcionalmente, la variable
+# CLOUDFLARE_ACCOUNT_ID. Si el secreto no está, el job NO falla: avisa y se salta el despliegue,
+# para no añadir un rojo más mientras la publicación siga siendo manual.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "landing/**"
+      - "wrangler.jsonc"
+      - "tools/deploy-landing.sh"
+      - ".github/workflows/landing.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: landing
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: ¿Hay token de Cloudflare?
+        id: cfg
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Falta el secreto CLOUDFLARE_API_TOKEN: no se publica la landing (puedes hacerlo con ./tools/deploy-landing.sh)."
+          fi
+
+      - name: Publicar la landing y comprobarla
+        if: steps.cfg.outputs.ok == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || '85acbbc7a2dbb26ec060129fab495c2f' }}
+        run: ./tools/deploy-landing.sh

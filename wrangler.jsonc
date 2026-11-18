@@ -1,0 +1,18 @@
+{
+  // Landing estática de winopo.es. Mismo patrón que komanda.es y app.billka.es: Worker con
+  // assets, sin VPS de por medio. GitHub es la fuente de verdad; `wrangler deploy` publica
+  // ./landing tal cual.
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "winopo",
+  "compatibility_date": "2026-11-18",
+  "assets": {
+    "directory": "./landing"
+  },
+  // `custom_domain: true` hace que `wrangler deploy` cree y mantenga el registro DNS en la
+  // zona winopo.es (Cloudflare crea un AAAA 100:: proxied). Sin esto, el Worker queda en
+  // winopo.systemavworks.workers.dev y el dominio no resuelve.
+  "routes": [
+    { "pattern": "winopo.es", "custom_domain": true },
+    { "pattern": "www.winopo.es", "custom_domain": true }
+  ]
+}
