@@ -95,16 +95,18 @@ Si `free -h` muestra menos de 800 MB disponibles y ya hay swap en uso, el debate
 
 | Dominio | Sirve | Cómo llega |
 |---|---|---|
-| `winopo.es` + `www` | landing estático (`landing/`) | Cloudflare Tunnel → `caddy:80` |
+| `winopo.es` + `www` | landing estático (`landing/`) | **Cloudflare Worker** con assets (`wrangler.jsonc`), publicado desde GitHub |
 | `app.winopo.es` | plataforma (Next.js) y API `/v1` | Cloudflare Tunnel → `caddy:80` |
 | `staging.winopo.es` | entorno de pruebas (un solo dominio) | **No** en esta caja: publica 80/443 |
 
-Los hostnames públicos los declara el túnel y él crea los CNAME (proxied); el apex funciona por *CNAME
-flattening*. Caddy enruta por nombre de host dentro de la red (`infra/caddy/Caddyfile`), así que el
-enrutado del túnel es el mismo para los tres: `HTTP caddy:80`.
+El landing **no depende de esta caja**: `tools/deploy-landing.sh` (o el workflow «landing» en cada push)
+sube `landing/` al Worker y Cloudflare crea el registro del apex y de `www` (`AAAA 100::` proxied) al atar
+el `custom_domain`. Caddy enruta por nombre de host dentro de la red (`infra/caddy/Caddyfile`), y el túnel
+solo necesita declarar `app.winopo.es` → `HTTP caddy:80`.
 
-En caja dedicada el esquema cambia a registros `A` en gris y certificado de Caddy por HTTP-01, con
-`tools/dns-cloudflare.sh --ip <IP>`.
+En caja dedicada, `app.winopo.es` pasa a registro `A` en gris y certificado de Caddy por HTTP-01, con
+`tools/dns-cloudflare.sh --ip <IP>`. El apex sigue siendo del Worker en los dos casos.
 
-El apex se sirve como archivos estáticos: si `core` o `web` se caen, la web comercial sigue en pie.
+El apex se sirve como archivos estáticos desde el edge: si `core` o `web` se caen, la web comercial sigue en
+pie, y el despliegue del landing no toca el servidor.
 Detalle del despliegue en [`../DEPLOY.md`](../DEPLOY.md).

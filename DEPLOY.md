@@ -10,12 +10,19 @@
 |---|---|---|---|
 | Local | `localhost:3000` / `:8080` | `infra/docker-compose.yml` | datos sintéticos |
 | Staging | `staging.winopo.es` | `infra/docker-compose.staging.yml` | datos sintéticos |
-| Producción | `winopo.es` (landing) + `app.winopo.es` (plataforma) | `infra/docker-compose.prod.yml` | datos reales |
+| Producción | `winopo.es` (landing, Worker de Cloudflare) + `app.winopo.es` (plataforma) | `infra/docker-compose.prod.yml` | datos reales |
 
-El despliegue es **manual por SSH** con un script. El workflow **Desplegar** (`.github/workflows/deploy.yml`)
+Hay **dos caminos de publicación**, y conviene no mezclarlos:
+
+| Qué | Dónde vive | Cómo se publica |
+|---|---|---|
+| Landing (`landing/`) → `winopo.es`, `www.winopo.es` | Cloudflare Workers con assets (`wrangler.jsonc`) | `tools/deploy-landing.sh`, o el workflow **landing** en cada push que toque `landing/**` |
+| Plataforma (`core`, `worker`, `web`, `db`) → `app.winopo.es` | la caja, detrás de Cloudflare Tunnel | workflow **Desplegar** (*Run workflow*) o `infra/scripts/deploy.sh` por SSH |
+
+El despliegue del servidor es **manual por SSH** con un script. El workflow **Desplegar** (`.github/workflows/deploy.yml`)
 lo lanza desde GitHub, pero solo cuando se le da a *Run workflow*: no despliega en cada push.
 Seis contenedores: `db`, `core`, `worker`, `web`, `caddy` y `cloudflared`. La misma imagen de `core` sirve
-los dos perfiles.
+los dos perfiles. El landing **no** es un contenedor: es un Worker de Cloudflare.
 
 Producción vive **en la caja compartida con Komanda** y el tráfico entra por Cloudflare Tunnel: este stack
 no publica ningún puerto. El porqué y el aislamiento están en
@@ -50,50 +57,55 @@ porque Caddy saca el certificado por HTTP-01.
 
 ### DNS
 
-Los registros se aplican con un script idempotente, no a mano en el panel. En la caja compartida el modo es
-**túnel**: los tres nombres quedan en CNAME proxied al túnel.
+Hay dos mitades y **no se gestionan igual**:
+
+**`winopo.es` y `www.winopo.es` son del Worker `winopo`.** Los crea Cloudflare al atar el
+`custom_domain` de [`wrangler.jsonc`](wrangler.jsonc) (un `AAAA 100::` proxied) y se publican con
+`tools/deploy-landing.sh` o el workflow **landing**. No se tocan a mano ni con el script de DNS: si
+alguien los reapunta al túnel, la web comercial deja de servirse.
+
+**`app.winopo.es` sí vive fuera de Cloudflare**, en la caja, y lo gestiona un script idempotente. En la
+caja compartida el modo es **túnel**:
 
 ```bash
 tools/dns-cloudflare.sh --tunnel            # simulación: enseña el cambio
 tools/dns-cloudflare.sh --tunnel --apply    # aplica
 ```
 
-| Nombre | Tipo | Valor |
-|---|---|---|
-| `winopo.es` | CNAME proxied | `<uuid>.cfargotunnel.com` |
-| `www.winopo.es` | CNAME proxied | `<uuid>.cfargotunnel.com` |
-| `app.winopo.es` | CNAME proxied | `<uuid>.cfargotunnel.com` |
+| Nombre | Tipo | Valor | Quién lo posee |
+|---|---|---|---|
+| `winopo.es` | AAAA proxied | `100::` | Worker `winopo` (`custom_domain`) |
+| `www.winopo.es` | AAAA proxied | `100::` | Worker `winopo` (`custom_domain`) |
+| `app.winopo.es` | CNAME proxied | `<uuid>.cfargotunnel.com` | la caja, vía túnel |
 
-El apex admite CNAME porque va proxied: Cloudflare lo achata. El script borra además el comodín muerto
-`*.winopo.es` y reapunta `www`, que apuntaban a `winopo.pages.dev`, un proyecto que ya no existe y devolvía
-`error code: 1014` en todo subdominio. No toca el `TXT` del SPF ni los `MX`.
+El script borra los restos muertos que quedan en la zona (`*.winopo.es` y cualquier CNAME a
+`winopo.pages.dev`, un proyecto que ya no existe y devolvía `error code: 1014`) y no toca el `TXT` del
+SPF ni los `MX`. Un registro `AAAA 100::` no se considera resto de Pages: es la firma del custom
+domain del Worker y se deja como está.
 
 Si el túnel no existe en la cuenta, el script sale con **2** sin escribir: un CNAME a `cfargotunnel` sin
-túnel detrás solo convierte el 1014 en un NXDOMAIN. Y con el túnel creado, el DNS no basta: hacen falta los
-tres hostnames dentro del túnel apuntando a `HTTP caddy:80`, o `cloudflared` responde 404.
+túnel detrás solo convierte el 1014 en un NXDOMAIN. Y con el túnel creado, el DNS no basta: hace falta el
+hostname dentro del túnel apuntando a `HTTP caddy:80`, o `cloudflared` responde 404.
 
-Hostnames públicos a declarar en Zero Trust → Tunnels → `winopo-cax11` (los tres al servicio
-`HTTP caddy:80`): `winopo.es`, `www.winopo.es`, `app.winopo.es`.
+Hostname público a declarar en Zero Trust → Tunnels → `winopo-cax11`: `app.winopo.es` → `HTTP caddy:80`.
 
-Con **IP propia** el modo es el otro, y deja registros en gris (Cloudflare no proxifica: Caddy gestiona el
-certificado por HTTP-01; en naranja solo tendría sentido con modo SSL "Full strict" y Origin CA):
+Con **IP propia** el modo es el otro, y deja el registro en gris (Cloudflare no proxifica: Caddy gestiona
+el certificado por HTTP-01; en naranja solo tendría sentido con modo SSL "Full strict" y Origin CA):
 
 | Nombre | Tipo | Valor |
 |---|---|---|
-| `winopo.es` | **A** | IP del servidor |
-| `www.winopo.es` | CNAME | `winopo.es` |
-| `app.winopo.es` | A | IP del servidor |
+| `app.winopo.es` | **A** | IP del servidor |
 | `staging.winopo.es` | A | IP del servidor (o de otro, si se separa) |
 
-El apex **no puede ser CNAME** sin *flattening*: por eso en modo IP es un registro `A` y en modo túnel lo
-achata Cloudflare.
+El apex y `www` siguen siendo del Worker en los dos modos: no hay registro `A` de apex, así que no hace
+falta *CNAME flattening* para ellos.
 
 Pasos completos, con el orden correcto (host → túnel → DNS → secretos → despliegue):
 [`docs/runbooks/alta-servidor-winopo.md`](docs/runbooks/alta-servidor-winopo.md).
 Comprobar antes de desplegar:
 
 ```bash
-dig +short winopo.es
+dig +short winopo.es        # IPs de Cloudflare: el Worker ya sirve el landing
 dig +short app.winopo.es
 ```
 
@@ -231,17 +243,35 @@ cuando se pueda (añadir columna con `default`, no renombrar en el mismo paso qu
 
 ## 6. El landing de `winopo.es`
 
-Es HTML estático en `landing/index.html`. **No requiere build ni reinicio de la aplicación.**
+Es HTML estático en `landing/`, publicado como **Worker de Cloudflare con assets** ([`wrangler.jsonc`](wrangler.jsonc)),
+igual que `komanda.es` y `app.billka.es`. **No pasa por el servidor**: no necesita build, ni `git pull` en
+la caja, ni recargar Caddy, y si la plataforma se cae la web comercial sigue en pie.
 
-- En el servidor, Caddy lo sirve desde `/srv/landing` (volumen de solo lectura del repositorio).
-- Cambiar el landing = `git pull` y, como mucho, `docker compose ... exec caddy caddy reload --config /etc/caddy/Caddyfile`.
+```bash
+tools/deploy-landing.sh           # publica y comprueba que lo servido es el repositorio
+tools/deploy-landing.sh --check   # solo comprueba, sin publicar
+make landing-deploy               # lo mismo, con make
+make landing-check
+```
+
+En CI lo hace el workflow **landing** (`.github/workflows/landing.yml`) en cada push a `main` que toque
+`landing/**` o `wrangler.jsonc`, con el secreto `CLOUDFLARE_API_TOKEN` (y opcionalmente la variable
+`CLOUDFLARE_ACCOUNT_ID`). Sin secreto el job **no falla**: avisa y se salta el despliegue.
+
+- `landing/_headers` lleva las cabeceras que antes ponía Caddy: HSTS, `nosniff`, `X-Frame-Options`,
+  `Referrer-Policy` y CSP con `script-src 'none'`. El script de publicación comprueba que llegan.
+- `landing/_redirects` manda `/login`, `/app` y `/v1` a `app.winopo.es`, como hacía el `redir` de Caddy.
 - Está pensado para no necesitar nada más: sin JavaScript, sin fuentes externas, sin cookies, sin
-  analítica. Por eso no hay banner de consentimiento (no hay nada que consentir) y la CSP del apex
-  bloquea scripts (`script-src 'none'`).
+  analítica. Por eso no hay banner de consentimiento (no hay nada que consentir) y la CSP bloquea
+  scripts (`script-src 'none'`).
 - La marca va aparte: `landing/assets/` contiene el emblema, el favicon, el icono de iOS y la tarjeta
   para redes. Salen del logo original con `python3 tools/marca/generar_marca.py`, que recorta, quita el
   fondo crema y genera cada tamaño. **Si cambia el logo, se regeneran; no se editan a mano.** Suman
-  unos 190 KB, servidos desde el mismo dominio (sin CDN ni terceros).
+  unos 190 KB, servidos por el mismo Worker (sin CDN ni terceros).
+
+El bloque del apex sigue en `infra/caddy/Caddyfile` como red de seguridad (sirve el mismo `landing/` desde
+`/srv/landing` dentro de la caja), pero en producción **no se usa**: el apex lo sirve el Worker. Si algún
+día se detacha el custom domain, ese bloque es lo que mantiene la web comercial sin tocar nada más.
 
 Detalles que no hay que olvidar al publicarlo:
 
@@ -249,7 +279,7 @@ Detalles que no hay que olvidar al publicarlo:
    **Quitar esas dos líneas el día del lanzamiento**, o el dominio no aparecerá en Google.
 2. El correo de contacto es `hola@winopo.es`: hay que crear el buzón o el alias antes de publicar.
 3. Las llamadas a la acción apuntan a `https://app.winopo.es/login`. Si cambia el subdominio, se
-   cambia en `landing/index.html` y en `infra/caddy/Caddyfile`.
+   cambia en `landing/index.html` y en `landing/_redirects`.
 4. La tarjeta para redes (`og:image`) apunta a `https://winopo.es/assets/og-winopo.jpg`: **la URL es
    absoluta a propósito** (los rastreadores de redes no resuelven rutas relativas), así que si el
    dominio cambia hay que regenerar y ajustar esa línea.

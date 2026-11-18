@@ -1,8 +1,10 @@
 # Runbook · Alta de WinOpo en la caja compartida (CAX11)
 
-**Estado a 18-nov-2026: WinOpo no está publicado y `winopo.es` no resuelve.** La zona de Cloudflare
-apunta a registros muertos (`*.winopo.es` y `www` → CNAME `winopo.pages.dev`, que ya no existe;
-Cloudflare responde `error code: 1014`) y el apex no tiene registro. Cualquier visita falla hoy.
+**Estado a 18-nov-2026: el landing ya está publicado en `winopo.es` y `www.winopo.es`** (Worker de
+Cloudflare con assets, `ok` verificado byte a byte contra `landing/index.html`). La zona está limpia: se
+borraron el comodín `*.winopo.es` y los CNAME a `winopo.pages.dev`, que devolvían `error code: 1014`.
+Falta **`app.winopo.es`**: la plataforma todavía no está desplegada en la caja, así que ese nombre no
+resuelve a propósito (el comodín muerto ya no existe).
 
 Este runbook publica WinOpo **en la misma caja que Komanda**, aislado y sin tocar su borde. Se ejecuta
 una vez; después se despliega con el workflow (§6).
@@ -14,7 +16,8 @@ una vez; después se despliega con el workflow (§6).
 | Komanda | esta caja, `/opt/komanda`, Caddy en 80/443 | Publicado · **no se toca** |
 | `app.billka.es` | Cloudflare Workers (`billka-app`) | Publicado · no se toca |
 | `api.billka.es` + su Postgres | esta caja, previsto en `billka/docs/runbook/despliegue-en-caja-compartida.md` | **Propuesta, sin ejecutar** |
-| `winopo.es`, `app.winopo.es` | esta caja, `/srv/winopo`, sin puertos, entrada por Cloudflare Tunnel | Este runbook |
+| `winopo.es` + `www` | Cloudflare Workers (`winopo`), `landing/` del repositorio | **Publicado** |
+| `app.winopo.es` | esta caja, `/srv/winopo`, sin puertos, entrada por Cloudflare Tunnel | Este runbook |
 
 Medido el 18-nov-2026 con `free -m`, `df -h /`, `docker stats` y `uptime`:
 
@@ -127,22 +130,32 @@ reglas nuevas de firewall, y el TLS lo termina el edge.
 
 1. Zero Trust → **Networks → Tunnels → Create a tunnel** → tipo `cloudflared` → nombre `winopo-cax11`.
 2. Copiar el token y pegarlo en `TUNNEL_TOKEN` del `.env` (§2).
-3. En el túnel → **Public hostname**, tres entradas al **mismo** servicio:
+3. En el túnel → **Public hostname**, una entrada (el landing **no** va por aquí: lo sirve el Worker):
 
 | Hostname | Servicio |
 |---|---|
-| `winopo.es` | `HTTP` → `caddy:80` |
-| `www.winopo.es` | `HTTP` → `caddy:80` |
 | `app.winopo.es` | `HTTP` → `caddy:80` |
 
 `caddy` resuelve por la red `winopo_default` porque `cloudflared` y `caddy` van en el mismo proyecto
-Compose. El túnel crea los CNAME en *proxied* y el apex por *CNAME flattening*: **no hace falta
-`Origin CA`, ni modo "Full (strict)", ni abrir el 80 al mundo**.
+Compose. El túnel crea el CNAME en *proxied*: **no hace falta `Origin CA`, ni modo "Full (strict)", ni
+abrir el 80 al mundo**.
 
 Si el token se filtra: rotarlo en el panel y actualizar `.env` (`docker compose up -d cloudflared`).
 No se guarda en git ni se pega en un chat.
 
 ## 4. DNS (Cloudflare)
+
+Hay dos mitades y las gestiona gente distinta:
+
+| Nombre | Tipo | Valor | Quién lo mantiene |
+|---|---|---|---|
+| `winopo.es` | AAAA proxied | `100::` | Worker `winopo` (`custom_domain` en `wrangler.jsonc`) |
+| `www.winopo.es` | AAAA proxied | `100::` | Worker `winopo` (`custom_domain` en `wrangler.jsonc`) |
+| `app.winopo.es` | CNAME proxied | `<uuid>.cfargotunnel.com` | este runbook, vía túnel |
+
+El apex y `www` **no se tocan a mano**: los crea Cloudflare al atar el custom domain y los mantiene
+`tools/deploy-landing.sh` (o el workflow «landing»). Si alguien los reapunta al túnel, la web comercial
+deja de servirse.
 
 `API_TOKEN_CLOUDFLARE` del `.env` necesita `Zone.DNS:Edit` sobre `winopo.es` y, para encontrar el túnel por
 nombre, `Account → Cloudflare Tunnel → Read`. El script simula por defecto:
@@ -153,30 +166,23 @@ tools/dns-cloudflare.sh --tunnel --apply              # aplica
 tools/dns-cloudflare.sh --tunnel --tunnel-id <uuid>   # si el token no puede listar túneles
 ```
 
-Deja los tres nombres del producto en CNAME *proxied* a `<uuid>.cfargotunnel.com`:
-
-| Nombre | Tipo | Valor |
-|---|---|---|
-| `winopo.es` | CNAME proxied | `<uuid>.cfargotunnel.com` |
-| `www.winopo.es` | CNAME proxied | `<uuid>.cfargotunnel.com` |
-| `app.winopo.es` | CNAME proxied | `<uuid>.cfargotunnel.com` |
-
-El apex admite CNAME porque va proxied: Cloudflare lo achata. El script borra además el comodín muerto
-`*.winopo.es` (apuntaba a `winopo.pages.dev`, un proyecto que ya no existe, y devolvía `error 1014` en todo
-subdominio), reapunta `www` en vez de borrarlo, y no toca el `TXT` del SPF ni los `MX`.
+Solo escribe `app.winopo.es`, en CNAME *proxied* a `<uuid>.cfargotunnel.com`. Además borra los restos
+muertos de la zona: el comodín `*.winopo.es` y cualquier CNAME a `winopo.pages.dev` (un proyecto que ya no
+existe y devolvía `error code: 1014` en todo subdominio). No toca el `TXT` del SPF ni los `MX`, y deja
+intacto el `AAAA 100::` del Worker.
 
 Si el túnel todavía no existe, el script sale con **2** y no escribe nada: un CNAME a `cfargotunnel` sin
 túnel detrás solo cambia el 1014 por un NXDOMAIN. Crearlo necesita `Account → Cloudflare Tunnel → Edit`,
 que este token no tiene: se hace una vez en el panel (§3).
 
-Ojo: el DNS solo no publica. El túnel necesita dentro los tres hostnames apuntando a `HTTP caddy:80`; si
-falta uno, `cloudflared` contesta 404 aunque el registro esté perfecto. El proyecto de Pages muerto se borra
-desde el panel (`Pages → Edit`) y no estorba.
+Ojo: el DNS solo no publica `app.winopo.es`. El túnel necesita dentro ese hostname apuntando a
+`HTTP caddy:80`; si falta, `cloudflared` contesta 404 aunque el registro esté perfecto.
 
-Comprobar cuando el túnel esté conectado:
+Comprobar:
 
 ```bash
-dig +short winopo.es @1.1.1.1       # CNAME a <uuid>.cfargotunnel.com, achatado
+dig +short app.winopo.es @1.1.1.1   # CNAME a <uuid>.cfargotunnel.com, achatado
+dig +short winopo.es @1.1.1.1       # IPs del edge: el Worker del landing, no la caja
 ```
 
 `staging.winopo.es` no se publica aquí: staging **publica 80/443** y en esta caja eso es de Komanda
@@ -235,15 +241,17 @@ Opcional: crear los *Environments* `prod` y `staging` con revisor obligatorio; e
 ## 7. Verificación
 
 ```bash
-# Desde tu máquina
-dig +short winopo.es @1.1.1.1
-curl -sS -o /dev/null -w '%{http_code}\n' https://winopo.es
+# Landing: lo sirve Cloudflare, no la caja
+tools/deploy-landing.sh --check      # compara index.html y los assets con el repositorio
+
+# Plataforma: lo sirve la caja por el túnel
+dig +short app.winopo.es @1.1.1.1
 curl -sS -o /dev/null -w '%{http_code}\n' https://app.winopo.es/healthz
-curl -sSI https://winopo.es | grep -iE 'strict-transport-security|^server'
+curl -sSI https://app.winopo.es/login | grep -iE 'strict-transport-security|^server'
 ```
 
-Esperado: CNAME a `cfargotunnel.com`, `200` en el landing y en `/healthz`, HSTS presente y
-`server: cloudflare`.
+Esperado: `LANDING_OK` en el landing (con HSTS, CSP y la redirección de `/login` a `app.winopo.es`),
+CNAME a `cfargotunnel.com` en `app`, `200` en `/healthz`, HSTS presente y `server: cloudflare`.
 
 ```bash
 # En la caja: aislamiento y convivencia
@@ -285,10 +293,10 @@ los registros con `tools/dns-cloudflare.sh --ip <nueva IP>` y se borran los host
 |---|---|
 | Copia programada | script listo, `cron`/temporizador sin configurar → [`backup-restauracion.md`](backup-restauracion.md) |
 | Monitorización | nada: ni disco, ni memoria, ni caída, ni del túnel |
-| CI/CD automático en cada push | no: el despliegue es manual, a propósito |
+| CI/CD automático en cada push | la **plataforma** no (despliegue manual, a propósito); el **landing** sí, vía workflow «landing» |
 | Alta de preparadores | manual, por `psql` |
 | R2, Stripe, SMTP, IA | variables vacías hasta que existan las cuentas |
-| Proyecto Pages borrado | su rastro solo se limpia en el panel; el token de DNS no tiene permiso de Pages |
+| Proyecto Pages `winopo` | ya no tiene registros en la zona (el DNS está limpio); el proyecto en sí solo se borra en el panel: el token no tiene permiso de Pages |
 | Límite de tasa / WAF en el edge | no configurado; se puede añadir sobre `winopo.es` sin tocar la caja |
 | `vinopo.es`, aviso legal, precio (D9) | decisiones de negocio, no de infraestructura |
 
@@ -297,7 +305,9 @@ los registros con `tools/dns-cloudflare.sh --ip <nueva IP>` y se borran los host
 | Síntoma | Dónde mirar | Causa típica |
 |---|---|---|
 | `error 1033` (túnel sin conexión) | `logs cloudflared` | token inválido o `cloudflared` caído |
-| `error 1014` en el dominio | DNS | queda algún CNAME a `*.pages.dev`; repetir §4 |
+| `error 1014` en un subdominio | DNS | quedó un CNAME a `*.pages.dev` en ese nombre; repetir §4 |
+| `winopo.es` sirve el landing viejo | `tools/deploy-landing.sh --check` | falta desplegar: `make landing-deploy`, o el workflow «landing» falló |
+| `winopo.es` sin HSTS ni CSP | `landing/_headers` | el fichero falta o el último deploy no lo subió (`wrangler deploy`) |
 | `502` en `app.winopo.es` | `logs caddy`, `ps` | `core` o `web` caídos o reiniciándose |
 | `502` en el túnel con `caddy` sano | hostname público mal declarado | el servicio debe ser `HTTP caddy:80`, no un puerto del host |
 | `cloudflared` en bucle | `logs cloudflared` | `TUNNEL_TOKEN` vacío o revocado |

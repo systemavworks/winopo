@@ -12,7 +12,7 @@ Un servicio + un worker + una base + un bucket. Nada de Kubernetes en v0.
 | `docker-compose.caja-propia.yml` | Override solo para caja dedicada: publica 80/443 y Caddy hace ACME |
 | `postgres/init.sql` | Solo local: rol `winopo_app` sin `BYPASSRLS` |
 | `seed/sintetica.sql` | 2 tenants y 3 roles falsos, para tests |
-| `caddy/Caddyfile` | TLS automático: `winopo.es` → landing estático, `app.winopo.es` → web + `/v1` → core |
+| `caddy/Caddyfile` | Enrutado de `app.winopo.es`: web + `/v1` → core (el landing lo sirve el Worker) |
 | `caddy/Caddyfile.staging` | Staging: un solo dominio, sin landing |
 | `scripts/backup.sh` | `pg_dump` a destino **externo**, retención 30 días |
 | `scripts/restore-test.sh` | Restauración probada; una copia sin probar no es una copia |

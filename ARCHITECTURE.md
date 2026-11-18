@@ -24,13 +24,21 @@ Tres decisiones mandan sobre todas las demás:
 ```
                  Internet
                     │
-              ┌─────▼──────┐
-winopo.es ───►│   Caddy    │  archivos estáticos (landing/index.html)
-              │   (TLS)    │
-app.winopo.es►└──┬──────┬──┘
-                  │      │
-      /v1/* , /healthz   │ todo lo demás
-                  │      │
+             ┌──────▼───────┐
+             │  Cloudflare  │
+             ├──────┬───────┤
+ winopo.es ──┤      │       │
+ (Worker)    ▼      ▼       │
+        landing/   │  túnel │
+       (assets)    │        │
+ app.winopo.es ────┴────────┘
+                    │
+               ┌────▼─────┐
+               │  Caddy   │  enrutado por dominio y cabeceras
+               └──┬────┬──┘
+                  │    │
+      /v1/* , /healthz  │ todo lo demás
+                  │    │
           ┌───────▼──┐ ┌─▼────────┐
           │  core    │ │  web     │  Next.js 15 (App Router), standalone
           │  (Ktor)  │ │  Node 22 │
@@ -46,12 +54,13 @@ app.winopo.es►└──┬──────┬──┘
 
 | Componente | Tecnología | Responsabilidad | No hace |
 |---|---|---|---|
-| `caddy` | Caddy 2 | TLS automático, enrutado por dominio, cabeceras, sirve el landing | lógica de negocio |
+| Worker `winopo` | Cloudflare Workers + assets estáticos | sirve `landing/` en `winopo.es` y `www.winopo.es` | lógica de negocio |
+| `caddy` | Caddy 2 | enrutado por dominio, cabeceras, TLS en caja dedicada; entrada del túnel | lógica de negocio |
 | `core` | Kotlin + Ktor + Netty | API HTTP `/v1`, sesiones, RBAC, acceso a datos | renderizar HTML |
 | `worker` | mismo binario, `WINOPO_PROFILE=worker` | cola de trabajos (maquetación, extracción, corrección) | atender HTTP |
 | `web` | Next.js 15 / React 19 | interfaz de preparador, opositor y admin | hablar con PostgreSQL |
 | `db` | PostgreSQL 16 | datos, aislamiento (RLS), cola de trabajos | exponerse al exterior |
-| `landing` | HTML estático | página pública de `winopo.es` | formularios con servidor propio |
+| `landing` | HTML estático | página pública de `winopo.es`, servida por el Worker de Cloudflare | formularios con servidor propio |
 
 **Por qué un solo binario con dos perfiles:** el worker comparte modelos, repositorios y configuración
 con la API. Separarlos duplicaría el SQL y las reglas de tenant. La imagen es la misma; lo único que
@@ -65,17 +74,20 @@ segundo) es un servicio menos que operar, copiar y asegurar.
 
 | Dominio | Qué sirve | Quién lo edita |
 |---|---|---|
-| `winopo.es` | landing comercial estática (`landing/index.html`) | marketing / HTML |
+| `winopo.es` + `www` | landing comercial estático (`landing/`), en un Worker de Cloudflare | marketing / HTML |
 | `app.winopo.es` | la plataforma (login, panel del preparador, panel del opositor) | `web/` |
 | `app.winopo.es/v1/*` | la API, consumida por la propia web y por clientes futuros | `core/` |
 | `staging.winopo.es` | copia con datos sintéticos | nadie: es para probar |
 
 El apex (`winopo.es`) sirve el landing y **no** la aplicación. Motivos: el landing cambia sin recompilar
-Next, se cachea en Caddy y una caída del backend no deja la web comercial en blanco. El Caddyfile
-redirige `/login`, `/app*` y `/v1*` del apex a `app.winopo.es`.
+Next, se publica sin tocar el servidor y una caída del backend no deja la web comercial en blanco.
+`landing/_redirects` manda `/login`, `/app*` y `/v1*` del apex a `app.winopo.es`.
 
-`landing/` se monta como volumen de solo lectura en `/srv/landing` dentro del contenedor de Caddy.
-Cambiar el landing = cambiar un HTML y recargar Caddy; no hay build. Los recursos de marca
+El landing **no depende de la caja**: `wrangler.jsonc` declara `landing/` como assets y `winopo.es` +
+`www.winopo.es` como `custom_domain`, y lo publica `tools/deploy-landing.sh` o el workflow «landing» en
+cada push. Cambiar el landing = cambiar un HTML y hacer push; no hay build. Las cabeceras que antes ponía
+Caddy viven en `landing/_headers`. Como red de seguridad, `infra/caddy/Caddyfile` sigue sirviendo el mismo
+`landing/` montado en `/srv/landing` si algún día se detacha el custom domain. Los recursos de marca
 (`landing/assets/`) se generan con `tools/marca/generar_marca.py` a partir del logo original: ahí no se
 edita a mano. El emblema se sirve sobre una pastilla crema porque el azul de la marca desaparece en
 modo oscuro, y el logo con el nombre completo no se usa en la cabecera: es un lockup vertical que a
