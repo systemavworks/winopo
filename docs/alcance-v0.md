@@ -12,116 +12,128 @@ Una plataforma donde un **preparador** publica su temario, sus tests y sus supue
 se examinan y reciben corrección con criterios explícitos. La plataforma pone la herramienta; el preparador pone el
 contenido y la autoridad pedagógica.
 
-Y donde un **opositor sin preparador** hace lo mismo por su cuenta: sube sus apuntes, maqueta su temario, se hace
-tests, entrega supuestos y ensaya la exposición oral. No es un modo degradado de la plataforma: es un espacio propio
-con su propio plan (D12). Si más adelante se vincula a un preparador, conserva su historial.
+Y donde un **opositor sin preparador** hace lo mismo por su cuenta: sube el temario que él se ha buscado, pide
+resúmenes, se hace tests, maqueta su temario y ensaya la exposición oral. No es un modo degradado: es un espacio
+propio con su propio plan (D13). Si más adelante se vincula a un preparador, conserva su historial.
+
+Hay **una sola relación** entre los dos lados, y es explícita: si el preparador **se adhiere** a WinOpo, el opositor
+puede contratarle **clases particulares**. No es un mercado, ni una comisión, ni un escaparate de material (D17).
 
 **Qué no es**, y conviene escribirlo antes de diseñar nada:
 
-- No es una academia: no hay profesores propios en v1.
-- No es un marketplace abierto: los preparadores los damos de alta nosotros, uno a uno.
+- No es una academia: no hay profesores propios. El tribunal del plan Máster lo hace un preparador adherido.
+- **No es un marketplace**: no se cobra por transacción entre usuarios ni se media en sus disputas.
+- No es gratis para nadie: el opositor paga su plan y el preparador paga su adhesión (D13).
 - No sustituye al preparador: la IA **nunca** fija la clave de un test ni la nota final.
 - No aloja libros de editorial: solo enlaces y material propio del preparador con cesión firmada.
 
-## 2. Dos espacios, un mismo dataset
+## 2. Un espacio por preparador; dos roles
 
-La unidad de aislamiento es el **espacio** (`tenant`), y hay dos tipos:
+La unidad de aislamiento es el **espacio** (`tenant`), y su dueño natural es **un preparador**: ahí viven su temario,
+sus tests, sus entregas y sus alumnos. La frontera no se toca: RLS forzada y, sin contexto de tenant, cero filas.
 
-| | Espacio preparador | Espacio opositor |
+Preparador y opositor **no son dos tipos de espacio**: son **roles** (`membership.rol`) dentro de un espacio.
+
+| | `membership.rol = preparador` | `membership.rol = opositor` |
 |---|---|---|
-| Quién | Un preparador y los opositores vinculados | Un opositor que prepara por su cuenta |
-| Ve | Sus grupos, su temario, entregas, estadísticas por tema | Su temario, sus tests, sus correcciones, su progreso |
-| Hace | Publica y versiona temario, corrige, programa tests, da accesos | Estudia, sube apuntes, maqueta, hace tests, entrega supuestos, ensaya el oral |
-| Nunca | Ve datos de otro preparador | Ve temario no publicado ni datos de otro opositor |
+| Quién | El preparador y sus tutores | El opositor vinculado a ese preparador |
+| Ve | Todo su tenant: temario, grupos, entregas, estadísticas | El material publicado de ese preparador y **su propio** progreso |
+| Hace | Publica y versiona temario, corrige, programa tests, admite solicitudes | Estudia, hace tests, entrega supuestos, ensaya el oral |
+| Nunca | Ve datos de otro preparador | Ve datos de otro opositor ni temario sin publicar |
 
-Son **dos shells de interfaz sobre un único backend y una única base de datos**. Dos rutas, dos menús, dos
-permisos; ni dos productos ni dos bases. El error caro aquí es duplicar el modelo de datos «porque son públicos
-distintos»: el dato es el mismo y cambia quién lo mira.
+**El opositor libre** —el que prepara por su cuenta— es dueño de un **espacio personal** de un solo miembro: no hay
+preparador al que pertenecer y su material necesita sitio. En cuanto se vincula, entra en el tenant del preparador
+como `membership.rol = opositor` y cambia de contexto como cualquier usuario.
 
-### 2.1 Vinculación entre espacios
+Lo que **no** se hace: darle al opositor un segundo tipo de tenant que tenga que leer el del preparador en cada
+petición. Eso rompe el fail-closed y el test de 404 cross-tenant de F0. Es la razón de que esta sección esté escrita
+así (D12, corregida).
 
-El opositor **no** pertenece al preparador: tiene su propio tenant. Lo que existe es una vinculación opcional.
+### 2.1 Vinculación: es una membership, no un enlace
 
 ```
-tenant(tipo = preparador | opositor)
-vinculacion(tenant_opositor_id, tenant_preparador_id, estado, desde, hasta)
+usuario(id, email, …)                        -- global, ámbito plataforma
+tenant(id, nombre, …)                        -- frontera RLS
+membership(tenant_id, usuario_id, rol, estado, desde, hasta)
+solicitud_plaza(id, tenant_id, usuario_id, mensaje, estado, decidida_en)   -- ámbito plataforma
 ```
 
-- Como mucho **una vinculación activa** por opositor en v1 (se mantiene el espíritu de D1, sin que el opositor
-  deje de ser espacio propio).
-- Al vincularse, el opositor recibe el material **publicado** del preparador y sus tests programados; el
-  preparador ve el progreso de estudio de ese opositor.
-- Al desvincularse, la fila se cierra (`hasta`) y el opositor conserva su temario propio, su historial y sus
-  correcciones. No se borra nada suyo para «devolverlo» a un estado anterior.
-- El alta del preparador sigue siendo manual: el material publicado tiene que tener responsable identificado.
+- Como mucho **una membership activa** de rol opositor en un tenant de preparador (D1): descubrir es libre,
+  comprometerse es uno.
+- La vinculación nace de una **solicitud de plaza** aceptada (D21) o de un alta directa del preparador. No hay chat:
+  mensaje corto y el contacto se revela cuando el preparador acepta.
+- Al desvincularse se cierra `hasta`; el opositor conserva su espacio personal, su historial y sus correcciones.
+- El alta del preparador sigue siendo manual y con **adhesión firmada**: el material publicado tiene que tener
+  responsable identificado.
 
-## 3. Aislamiento por espacio
+## 3. Tres ámbitos, tres reglas
 
-Toda tabla con `tenant_id` lleva RLS forzado, como en Billka: sin contexto de tenant no se ve una fila. Un
-preparador no puede, ni por error de código, leer el temario de otro; y un opositor no puede leer los apuntes de
-otro opositor.
+| Ámbito | Qué contiene | Quién lee | Cómo se protege |
+|---|---|---|---|
+| `tenant` | Temario, tests, entregas, correcciones, progreso | Miembros de ese tenant, según rol | RLS forzada, `FORCE ROW LEVEL SECURITY`, sin `BYPASSRLS` |
+| `plataforma` | Identidad de usuario, perfil público del preparador, solicitudes de plaza, cuotas | El propio usuario, o cualquiera si el perfil es opt-in | Tablas propias y políticas explícitas; **nunca** datos de alumnos |
+| `admin` | Censo, soporte, auditoría | WinOpo | Rol de plataforma con `audit_log` |
 
-Hay **tres** lecturas cruzadas permitidas, y solo tres:
+Dentro del `tenant`, un opositor ve lo suyo y lo publicado, y su preparador ve el progreso de sus memberships. Eso no
+es una lectura cruzada: es el mismo espacio con dos roles.
 
-1. `vinculacion` — el preparador ve el progreso de estudio del opositor vinculado (temas, tests, notas,
-   correcciones). No ve su material privado ni nada fuera de la plataforma.
-2. `material_publicado` — lo que el preparador publica lo ven sus vinculados. Un opositor no vinculado no ve nada,
-   ni por enlace directo: el permiso se comprueba en el servidor.
-3. `directorio` — la ficha pública del preparador (materia, plazas, contacto). Es dato profesional, no dato
-   personal del opositor.
+El **ámbito de plataforma** es deliberadamente cross-tenant y por eso no comparte ni una tabla con el negocio: no se
+relaja la RLS de `tenant` «porque el perfil es público». Y el preparador **nunca** ve el censo de opositores: ve sus
+memberships. El censo es `admin`.
 
-El opositor puede vivir toda la vida de la plataforma sin vincularse a nadie. Si se vincula y luego cambia de
-preparador, se cierra una vinculación y se abre otra: el historial es suyo y no se migra al preparador.
+## 4. Planes: todo de pago, y se cobra a los dos
 
-## 4. Planes y comercialización
+Se vende por **temporada** (septiembre–mayo), nunca como suscripción mensual continua. Para no confundir tres cosas
+en la misma reunión: **bloque** es una parte del temario, **plan** es lo que se contrata y **módulo** es lo que un
+plan desbloquea.
 
-Se vende por **temporada** (septiembre–mayo), nunca por suscripción mensual continua, y con dos escalas, una por
-espacio. Para no confundir tres cosas en la misma reunión: **bloque** es una parte del temario (una materia), **plan**
-es lo que se contrata y **módulo** es lo que un plan desbloquea.
+**No hay plan gratuito** (D13). Y se cobra a los dos lados, por cosas distintas (D19): al preparador, la herramienta
+con la que produce; al opositor, el acceso a lo que consume.
 
-**Espacio preparador**
+### 4.1 Plan del opositor
 
-| Nivel | Incluye |
-|---|---|
-| Base | Temario versionado, **PDF maquetado** y tests con clave fija |
-| + IA | Supuestos corregidos por IA con rúbrica, nunca nota final |
-| + Preparador | Corrección humana y tutoría |
-| Curso completo | Todo lo anterior + vídeo |
+| | Temario + tests | Resúmenes IA | Maquetación | Corrección IA | Corrección humana |
+|---|---|---|---|---|---|
+| **Básico** | Sí | Sí | — | — | — |
+| **Pro** | Sí | Sí | Sí (cuota de páginas/mes) | — | — |
+| **Máster** | Sí | Sí | Sí (cuota mayor) | Sí (límite/mes) | Del preparador |
 
-**Espacio opositor — plan propio (D13)**
+- **El resumen es un derivado**: se genera una vez por `tema_version`, se cachea, lo revisa y publica el preparador y
+  lo consumen todos sus alumnos (D20). Generarlo por alumno se lleva el margen en tokens.
+- **La maquetación es el escalón de Pro**, no del Básico: es el trabajo que hoy se encarga por fuera a 1,30–3,00 €
+  por página —un temario de 500–700 páginas cuesta 650–2.100 €— y lo que hace que alguien suba de nivel.
+- **El tribunal del Máster no es IA**: lo hace un preparador, que escucha, repregunta y firma el informe. Cada ensayo
+  es una hora de una persona: el plan lleva un número cerrado por temporada y WinOpo liquida cada uno.
+- **Maquetar el temario de un opositor es material propio, nunca de editorial**: cuota de páginas, almacenamiento
+  privado y prohibido compartir el PDF resultante (D22).
 
-| Plan | Incluye | Coste variable |
-|---|---|---|
-| Básico | Temario y apuntes propios maquetados en PDF, tests con corrección explicada, guías y plan de estudio | Casi nulo |
-| Pro | + supuestos con rúbrica, corrección asistida por IA validable y tribunal simulado | IA + transcripción |
-| Master | + vídeo y animaciones de repaso, simulacro completo y tope de ensayos ampliado | IA + vídeo |
+### 4.2 Qué paga el preparador
 
-Los nombres («Básico / Pro / Master») son provisionales; la escalera de tres niveles y lo que desbloquea cada uno,
-no. La **vinculación con un preparador no está a la venta**: se incluye en los tres planes, porque el material que
-aporta ya lo paga él.
+Herramienta profesional, por temporada y por tramos de alumnos: temas ya maquetados y versionados, corrección con IA,
+vídeo IA para sus alumnos, **bibliografía vigilada** (D23), estadísticas por tema y el tribunal que él imparte.
 
-Tres reglas de precio:
+**Dos modalidades para sus alumnos**, y las dos acaban en WinOpo: el alumno paga su plan con registro abierto (D16), o
+el preparador **compra plazas** y las incluye en su precio. En ambos casos, `client_reference_id = membership_id`.
 
-1. **Preparador**: el software no puede pasar del 10 % de lo que factura por alumno. Si cobra 60 €/mes por alumno,
-   el módulo no puede costar 6 €/mes.
-2. **Opositor**: el plan Básico tiene que salir más barato que **mandar maquetar el temario por fuera** (hoy se
-   cobran 40–90 € por tema, §7.1). Si no sale más barato, no hay razón para contratarlo.
-3. **Ningún plan con IA sin tope**: Pro y Master llevan un máximo de correcciones y de ensayos de oral por
-   temporada. La IA y el tribunal son las dos piezas con coste variable; sin tope, se venden a pérdida.
+### 4.3 La única relación entre los dos lados
 
-Falta el dato real del preparador para fijar tarifas (D9). Cobrar al opositor exige Stripe con cliente final
-persona física (D13), que es un circuito distinto del cobro a una academia.
+`perfil público opt-in → solicitud de plaza → el preparador acepta → membership en su tenant` (D21). Sin chat, sin
+comisión, sin valoraciones y sin carrito. Los datos de contacto se revelan al aceptar, y todo queda en `audit_log`.
 
-### 4.1 Cómo entra cada uno
+Va en **F6**, no antes: con tres preparadores y pocos alumnos el nexo no tiene liquidez. Lo que retiene al opositor no
+es el contacto, es el temario ya maquetado, el histórico de correcciones y la bibliografía vigilada.
 
-| | Opositor | Preparador |
-|---|---|---|
-| **Alta** | **Registro abierto** (D16): correo verificado y tenant propio creado en la misma transacción | Alta guiada: cesión de derechos firmada y revisión del material |
-| **Paga** | Su plan, por temporada | Por alumno cubierto, según D9 |
-| **Vinculación** | Opcional: enlace o código del preparador, y no depende de él para entrar | Ve a los opositores vinculados, no al resto |
+### 4.4 Reglas de precio
 
-El registro abierto obliga a límite de intentos y captcha: cada cuenta nueva puede empezar a gastar IA el primer
-día, y el que abusa no paga.
+1. **Opositor**: el plan completo por debajo del **15 %** de lo que ya paga por prepararse (95–200 €/mes, es decir
+   1.350–2.000 € por temporada). Techo del plan: ~260 €.
+2. **Preparador**: la cuota por debajo del **10 %** de lo que factura. Con 10 opositores son 17.500 €; con 30, más de
+   35.000 €.
+3. **Ningún plan con IA ni con tribunal sin tope**: son coste variable y horas humanas.
+4. **Nadie paga dos veces**: lo que cubre el preparador no se le vuelve a facturar al alumno como módulo.
+5. **Nada de cobrar por contacto**: la cuota es por herramienta y por tramos, no por lead (D19).
+
+Cifras propuestas en D9 (Básico 90 €, Pro 160 €, Máster 250 €; cuota de preparador 600 €), pendientes de su firma.
 
 ## 5. Reglas de IA (no negociables)
 
@@ -209,7 +221,8 @@ Los competidores ya tienen tests con estadísticas. Lo que no hay, o casi no hay
 1. Corrección de supuestos con **rúbrica publicada** (puntos por apartado, tolerancias, penalizaciones).
 2. Trazabilidad de quién corrigió: IA, preparador o validado.
 3. Temario **versionado** con fuentes citadas y vídeo atado a la versión.
-4. Los dos espacios (preparador y opositor) sobre **el mismo dataset**, no dos productos con un Excel en medio.
+4. El aula del preparador y el espacio personal del opositor sobre **el mismo dataset**, no dos productos con un
+   Excel en medio.
 5. **Tribunal simulado**: exponer en voz alta, con repreguntas y un informe que dice en qué se cae, sin inventarse
    una nota oficial.
 
@@ -256,16 +269,23 @@ los datos de menores de los opositores. **No es un detalle de redacción.**
 
 | # | Decisión | Estado |
 |---|---|---|
-| D1 | ¿El preparador puede ser alumno de otro preparador? | Recomendado: no en v1 (ver D12: el opositor ya es espacio propio) |
+| D1 | ¿El preparador puede ser alumno de otro preparador? | **Cerrado**: no en v1; descubrir es libre, comprometerse es uno (D21) |
 | D6 | Nombre y dominio | **Cerrado**: `winopo.es` (17-nov-2026) |
 | D8 | Vídeo: voz + diapositivas o avatar | Recomendado: voz + diapositivas |
-| D9 | Precio por módulo y por plan | Bloqueado: falta el precio actual del preparador |
-| D10 | ¿Se cobra el alta del preparador? | Recomendado: no; se cobra por alumno |
-| D12 | ¿El opositor sin preparador tiene espacio propio? | **Cerrado**: sí, tenant `opositor` con vinculación opcional (17-nov-2026) |
-| D13 | ¿Cómo paga el opositor? | **Cerrado**: plan propio por temporada con tres niveles: Básico, Pro y Master (17-nov-2026) |
-| D14 | ¿Se vende material dentro de la plataforma? | **Cerrado**: fuera de v1; pagar un plan no convierte al opositor en vendedor (17-nov-2026) |
-| D15 | Tribunal simulado: ¿voz en directo o audio grabado? | Recomendado: audio grabado + transcripción (más barato y auditable) |
-| D16 | ¿Cómo entra cada uno? | **Cerrado**: registro abierto para el opositor, alta guiada para el preparador (17-nov-2026) |
+| D9 | Precio por plan y cuota del preparador | **Método cerrado** con datos de mercado; cifras propuestas pendientes de su firma |
+| D10 | ¿Se cobra el alta del preparador? | **Cerrado**: no hay alta; cuota por temporada según tramos de alumnos (D19) |
+| D12 | ¿Dos tipos de tenant? | **Corregida**: un tenant por preparador, dos roles y un ámbito de plataforma (D18) |
+| D13 | ¿Cómo paga el opositor? | **Cerrado**: Básico, Pro y Máster; todo de pago, sin nivel gratuito |
+| D14 | ¿Se vende material dentro de la plataforma? | **Cerrado**: fuera de v1; pagar un plan no convierte al opositor en vendedor |
+| D15 | Tribunal: ¿voz en directo o audio grabado? | Recomendado audio grabado para la IA; en Máster lo hace un preparador (D13) |
+| D16 | ¿Cómo entra cada uno? | **Cerrado**: registro abierto del opositor; alta guiada y adhesión del preparador |
+| D17 | ¿Cómo se vende al preparador? | **Cerrado**: adhesión y cuota por temporada; las clases las cobra él, sin comisión (D19) |
+| D18 | ¿Cuántos ámbitos de datos hay? | **Cerrado**: `tenant`, `plataforma` y `admin`, con tablas propias |
+| D19 | ¿A quién se cobra? | **Cerrado**: a los dos, por productos distintos, sin Stripe Connect |
+| D20 | ¿El resumen se genera por alumno? | **Cerrado**: derivado cacheado por `tema_version`, revisado por el preparador |
+| D21 | ¿Cómo se conecta opositor y preparador? | **Cerrado**: perfil opt-in → solicitud → membership, sin chat, en F6 |
+| D22 | ¿Cabe la maquetación a escala en el servidor? | **Cerrado** el diseño (cola + cuota de páginas); falta medir memoria real |
+| D23 | ¿Se promete temario actualizado? | **Cerrado**: se vende **aviso**, no garantía |
 
 ## 11. Competencia real
 

@@ -6,11 +6,11 @@
 
 ## 1. Resumen en una frase
 
-WinOpo es un SaaS **multi-tenant con dos tipos de espacio** —preparador y opositor— donde el opositor
-estudia temario maquetado, hace tests corregidos automáticamente, resuelve supuestos prácticos, ensaya
-la exposición ante un tribunal simulado y ve su progreso; el preparador publica, corrige y responde ante
-sus opositores. El opositor puede usar la plataforma sin preparador (D12) y vincularse después sin
-perder su historial.
+WinOpo es un SaaS **multi-tenant donde el tenant es el preparador** y preparador y opositor son **roles**
+(`membership.rol`), donde el opositor estudia temario maquetado, hace tests corregidos automáticamente, resuelve
+supuestos prácticos, ensaya la exposición ante un tribunal y ve su progreso; el preparador publica, corrige y
+responde ante sus opositores. El opositor que prepara por su cuenta tiene un **espacio personal** de un solo miembro
+y puede vincularse a un preparador después sin perder su historial (D12 corregida, D18).
 
 Tres decisiones mandan sobre todas las demás:
 
@@ -114,8 +114,11 @@ tenant (preparador)  1 ──── n  membership  n ──── 1  app_user
 - Un `app_user` es global (una persona, un correo, una contraseña).
 - `membership` une persona y preparador con un rol. Una persona puede ser opositor en un preparador
   y preparador en otro.
-- **v1: un opositor pertenece a un solo preparador** (D1). Si el login encuentra varias pertenencias
-  de rol opositor, responde `409 varias_pertenencias` en lugar de adivinar.
+- **v1: un opositor tiene como mucho una `membership` activa de rol opositor** en un tenant de preparador (D1); su
+  espacio personal no cuenta como pertenencia. Si el login encuentra varias, responde `409 varias_pertenencias` en
+  lugar de adivinar.
+- **Ámbito de plataforma** (D18): identidad de usuario, perfil público opt-in, solicitudes de plaza y cuotas viven en
+  tablas propias, fuera del `tenant_id` del negocio. Ahí no hay datos de alumnos.
 
 ### Los cuatro contextos de acceso
 
@@ -206,7 +209,7 @@ el campo se omite.
 |---|---|---|
 | Cloudflare R2 (S3) | PDFs, vídeos, escaneos de temario | nunca se sirve el binario directo: URLs firmadas de corta duración |
 | IA (corrección asistida) | corregir supuestos prácticos | interfaz propia (`CorrectorIA`); el proveedor se cambia sin tocar el dominio; **no** se envían datos personales del opositor, solo el texto del supuesto |
-| Stripe | cobros en dos circuitos: el preparador (B2B, por alumno) y los planes del opositor (B2C: Básico, Pro y Master, D13); el opositor vinculado no paga dos veces el mismo material |
+| Stripe | cobros en dos circuitos, ninguno Connect: el preparador (B2B, cuota por temporada y tramos de alumnos) y los planes del opositor (B2C: Básico, Pro y Máster, D13); el opositor vinculado no paga dos veces el mismo material |
 | WeasyPrint (`maquetador`) | generar PDF desde HTML | contenedor aparte: sus dependencias nativas no contaminan la imagen de `core` (D11) |
 
 Regla general: **ningún servicio externo recibe identificadores internos** (ni `tenant_id` ni `user_id`);
@@ -246,9 +249,9 @@ Enumerado para que nadie asuma que existe:
 ## 12. Decisiones relacionadas
 
 `docs/decisiones.md` es la fuente de verdad. Las que afectan a esta arquitectura:
-D1 (una vinculación activa por opositor), D12 (dos tipos de tenant: preparador y opositor), D3 (Kotlin/Ktor),
+D1 (una vinculación activa por opositor), D12 (un tenant por preparador; preparador y opositor son roles), D3 (Kotlin/Ktor),
 D4 (Next.js), D6 (RLS en la base), D7 (responsable del tratamiento, pendiente), D9 (precio, pendiente),
-D10 (PBKDF2), D11 (WeasyPrint en contenedor aparte), D13 (planes Básico/Pro/Master del opositor),
+D10 (PBKDF2), D11 (WeasyPrint en contenedor aparte), D13 (planes Básico/Pro/Máster del opositor),
 D15 (tribunal simulado con audio grabado).
 
 - Despliegue: [`DEPLOY.md`](DEPLOY.md)

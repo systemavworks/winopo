@@ -60,14 +60,18 @@ Nada de microservicios, ni Kubernetes, ni colas gestionadas en v0: un servicio, 
 
 | Tabla | Clave para qué | Notas |
 |---|---|---|
-| `tenant` | Un espacio = un tenant (preparador u opositor) | `slug`, `nombre`, `estado`; **falta `tipo`** — migración pendiente (D12) |
-| `vinculacion` | Vínculo opcional opositor ↔ preparador | **No existe**: `tenant_opositor_id`, `tenant_preparador_id`, `estado`, `desde`, `hasta` (D12) |
+| `tenant` | Un espacio: el de un preparador, o el personal de un opositor libre | `slug`, `nombre`, `estado`, `tipo` (`preparador` / `personal`). **D18**: la frontera RLS no cambia |
 | `app_user` | Cuenta con login | Único por correo normalizado |
-| `membership` | Qué usuario pertenece a qué tenant y con qué rol | `preparador`, `opositor`, `admin` |
+| `membership` | Qué usuario pertenece a qué tenant y con qué rol | `rol` (`preparador` / `opositor`), `desde`, `hasta`. **La vinculación es esto**: una membership activa de rol opositor en el tenant del preparador (D12 corregida) |
+| `perfil_preparador` | Ficha pública opt-in del preparador adherido | **Ámbito plataforma**: `tenant_id`, `materia`, `plazas`, `descripcion`, `publicado` (D21) |
+| `solicitud_plaza` | Solicitud de plaza de un opositor | **Ámbito plataforma**: `tenant_id`, `app_user_id`, `mensaje`, `estado`, `decidida_en`, `decidida_por` (D21) |
+| `adhesion_preparador` | Adhesión y cuota del preparador | **Ámbito plataforma**: `tenant_id`, `temporada`, `tramo`, `estado`, `stripe_ref` (D17/D19) |
 | `temario` | Conjunto de temas de una oposición | Por tenant y convocatoria |
 | `tema` | Unidad de estudio | Orden, título, estado |
 | `tema_version` | Versión inmutable del contenido | `version`, `publicado_en`, `autor_id` |
 | `tema_fuente` | Cita de cada versión | Norma, BOE/BOJA, URL, fecha |
+| `tema_fuente_aviso` | Norma cambiada detectada | **No existe**: `tema_fuente_id`, `boletin`, `detectado_en`, `estado` (D23) |
+| `resumen_derivado` | Resumen por versión del tema | **No existe**: cacheado por `tema_version` + `prompt_version` + `modelo`, con `revisado_por` y `publicado_en` (D20) |
 | `pregunta` | Banco de preguntas | `tema_id`, `enunciado`, `clave` (fija) |
 | `pregunta_opcion` | Opciones de la pregunta | `es_correcta` |
 | `test` | Examen generado | `tema_ids`, `n_preguntas`, `publicado` |
@@ -79,11 +83,12 @@ Nada de microservicios, ni Kubernetes, ni colas gestionadas en v0: un servicio, 
 | `entrega` | Supuesto entregado por el opositor | Fichero o texto |
 | `correccion` | Corrección de una entrega | **`corregido_por`**, `modelo`, `prompt_version` |
 | `correccion_item` | Puntos por apartado | Trazable a `rubrica_item` |
+| `ensayo_tribunal` | Ensayo del oral con informe | **No existe**: `membership_id`, `audio_ref`, `transcripcion`, `informe`, `preparador_id`, `liquidado` (D13/D15) |
 | `video` | Derivado del tema | `tema_version_id`, `guion_sha256`, `estado` |
 | `job` | Cola de trabajo | `tipo`, `estado`, `intentos`, `ultimo_error` |
 | `consent` | Consentimientos y renuncia al desistimiento | Fecha, IP, texto versionado |
-| `plan_contratado` | Plan del opositor por temporada | **No existe**: `tenant_id`, `plan` (`basico`/`pro`/`master`), `temporada`, `estado`, `stripe_ref` (D13) |
-| `consumo_plan` | Tope de uso de IA y tribunal | **No existe**: contadores por `tenant_id` y temporada; sin esto el plan Master se vende a pérdida |
+| `plan_contratado` | Plan del opositor o plazas compradas por el preparador | **No existe**: `tenant_id`, `membership_id`, `plan` (`basico`/`pro`/`master`), `temporada`, `estado`, `stripe_ref` (D13/D19) |
+| `consumo_plan` | Topes de uso del plan | **No existe**: `plan_contratado_id`, `recurso` (`ia`/`tribunal`/`paginas`), `consumido`, `limite` (D22) |
 | `audit_log` | Quién hizo qué | Append-only |
 
 Reglas transversales: toda tabla de contenido lleva `tenant_id` y RLS forzado; toda tabla con historial lleva
@@ -168,35 +173,46 @@ es un argumento concreto frente a Opogestión y crea dependencia sana: nadie mig
 - **Aceptación**: un tema pasa a vídeo sin intervención manual; regenerar el vídeo de una versión no borra el
   anterior; la demo caduca sola.
 
-### F5 · Cobro y alta de preparadores — 4 semanas
+### F5 · Cobro y alta de preparadores — 5 semanas
 
-- **Dos circuitos de Stripe**, no uno: el preparador (B2B, por alumno) y los planes del opositor (B2C).
-- Planes del opositor **Básico / Pro / Master** (D13), por temporada, con subida de nivel sin pagar dos veces lo
-  mismo.
-- Tope de uso por plan (`consumo_plan`): correcciones de IA y ensayos de tribunal. Se comprueba antes de encolar el
-  trabajo, no después de gastarlo.
+- **Dos circuitos de Stripe, y ninguno es Connect**: planes del opositor (B2C) y cuota del preparador (B2B) por tramos
+  de alumnos, más la compra de **plazas** para sus alumnos. WinOpo no cobra por cuenta ajena (D19).
+- Planes del opositor **Básico / Pro / Máster** (D13), por temporada: Básico (temario, resúmenes y tests), Pro
+  (+ maquetación) y Máster (+ corrección IA y tribunal con preparador). Subir de nivel no paga dos veces lo mismo.
+- Topes por plan (`consumo_plan`): correcciones de IA, ensayos de tribunal y **páginas maquetadas** (D22). Se
+  comprueban antes de encolar el trabajo, no después de gastarlo.
 - Webhooks idempotentes, facturas, cupones de temporada.
 - Checkout con **clic de renuncia al desistimiento** (art. 103.m TRLGDCU) guardado con fecha, IP y versión del texto.
-- Alta guiada de los 3 preparadores; panel de admin mínimo.
-- **Aceptación**: compra de prueba de un plan del opositor y de una plaza de preparador, factura con IVA correcto en
-  los dos casos, acceso concedido por webhook y no por retorno del navegador; el cuarto ensayo de oral del plan Pro
-  se rechaza con un mensaje claro y no con un error del proveedor; consentimiento recuperable y auditable.
+- Alta guiada de los 3 preparadores con **adhesión firmada** (`adhesion_preparador`), y panel de admin mínimo.
+- **Aceptación**: compra de prueba de un plan del opositor y de una cuota de preparador, factura con IVA correcto en
+  los dos casos, acceso concedido por webhook y no por el retorno del navegador; el ensayo N+1 del Máster se rechaza
+  con un mensaje claro y no con un error del proveedor; consentimiento recuperable y auditable.
 
-### F5.5 · Alta pública — 1 semana
+### F5.5 · Alta pública — 2 semanas
 
-- `/registro` (D16): correo y clave, verificación por enlace, creación de `tenant` `opositor` + `membership` en una
-  sola transacción.
-- Límite de intentos por IP y por correo, más captcha: el alta abierta es una factura abierta.
-- **Aceptación**: un alta real desde el móvil deja al opositor dentro en menos de dos minutos; el mismo correo no
-  crea dos cuentas; sin correo verificado no se entra; y un intento masivo se frena sin bloquear a un usuario
-  legítimo.
+- `/registro` (D16): correo y clave, verificación por enlace, creación del **espacio personal** del opositor y de su
+  `membership` en una sola transacción.
+- Elección de plan en el mismo flujo o después: **sin plan no hay acceso** (D13), así que la pantalla tiene que dejar
+  claro qué se paga antes de entrar.
+- Límite de intentos por IP y por correo, más captcha.
+- **Aceptación**: un alta real desde el móvil deja al opositor dentro en menos de dos minutos; el mismo correo no crea
+  dos cuentas; sin correo verificado no se entra; sin plan no se abre ningún módulo; y un intento masivo se frena sin
+  bloquear a un usuario legítimo.
 
-**Total: 24 semanas** de desarrollo (18 originales + 2 de maquetación + 2 de tribunal simulado + 1 de alta pública +
-1 de cobro B2C con planes). Con un solo desarrollador y sin imprevistos, arrancar el 1-dic-2026 lleva a mediados
-de mayo de 2027, con margen hasta septiembre.
+### F6 · Nexo opositor–preparador — 2 semanas
 
-**Total: 22 semanas** de desarrollo (18 originales + 2 de maquetación + 2 de tribunal simulado). Con un solo
-desarrollador y sin imprevistos, arrancar el 1-dic-2026 lleva a mediados de mayo de 2027, con margen hasta
+- **Ámbito plataforma** con tablas propias: `perfil_preparador` y `solicitud_plaza`. Nada de relajar la RLS del
+  negocio para hacer un directorio (D18).
+- Perfil público **opt-in**, revisado por WinOpo; datos de contacto del opositor ocultos hasta la aceptación.
+- Solicitud con mensaje corto → el preparador acepta → se crea la `membership` en su tenant. **Sin chat, sin
+  comisión, sin valoraciones y sin carrito** (D21).
+- Todo el recorrido en `audit_log`, incluido el rechazo.
+- **Aceptación**: un opositor solicita plaza sin que su correo aparezca en ningún HTML público; al aceptar, entra en
+  el tenant del preparador y ve su temario publicado; al desvincularse conserva su espacio personal y su historial;
+  y ninguna consulta del ámbito plataforma devuelve datos de alumnos.
+
+**Total: 28 semanas** de desarrollo (F0 2 + F1 3 + F2 3 + F2.5 2 + F3 4 + F3.5 2 + F4 3 + F5 5 + F5.5 2 + F6 2). Con
+un solo desarrollador y sin imprevistos, arrancar el 1-dic-2026 lleva a mediados de junio de 2027, con margen hasta
 septiembre.
 
 ## 6. Entornos y CI
@@ -254,6 +270,10 @@ tema_version ─► guion (humano o IA, revisado) ─► TTS ─► diapositivas
 
 - Stripe Checkout con `client_reference_id` = `membership_id`; el acceso se concede **por webhook**, nunca por el
   retorno del navegador.
+- **Dos productos distintos** (D19): el plan del opositor (B2C) y la cuota del preparador (B2B) por temporada y tramo
+  de alumnos, más las plazas que compre para sus alumnos. **Sin Stripe Connect, sin comisión y sin payout**: WinOpo
+  no cobra por cuenta de nadie.
+- La cuota del preparador **no se cobra por contacto**: cobrar el lead es el incentivo máximo para fugarse (D21).
 - Webhooks idempotentes por `event.id` en tabla propia.
 - Factura con IVA español; si el asesor confirma exención de enseñanza (D4), se configura la tasa y se documenta.
 - Renuncia al desistimiento: casilla obligatoria, texto versionado, guardada con fecha e IP.

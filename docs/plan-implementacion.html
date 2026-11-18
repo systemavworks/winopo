@@ -103,13 +103,18 @@
 <table>
   <thead><tr><th>Tabla</th><th>Clave para qué</th><th>Notas</th></tr></thead>
   <tbody>
-    <tr><td><code>tenant</code></td><td>Un preparador = un tenant</td><td><code>slug</code>, <code>nombre</code>, <code>estado</code></td></tr>
+    <tr><td><code>tenant</code></td><td>Un espacio: el de un preparador, o el personal de un opositor libre</td><td><code>slug</code>, <code>nombre</code>, <code>estado</code>, <code>tipo</code> (<code>preparador</code> / <code>personal</code>); la frontera RLS no cambia (D18)</td></tr>
     <tr><td><code>app_user</code></td><td>Cuenta con login</td><td>Único por correo normalizado</td></tr>
-    <tr><td><code>membership</code></td><td>Usuario en tenant, con rol</td><td><code>preparador</code>, <code>opositor</code>, <code>admin</code></td></tr>
+    <tr><td><code>membership</code></td><td>Usuario en tenant, con rol</td><td><code>rol</code> (<code>preparador</code> / <code>opositor</code>), <code>desde</code>, <code>hasta</code>. La vinculación es esto (D12 corregida)</td></tr>
+    <tr><td><code>perfil_preparador</code></td><td>Ficha pública opt-in</td><td><strong>Ámbito plataforma</strong>: materia, plazas, descripción, publicado (D21)</td></tr>
+    <tr><td><code>solicitud_plaza</code></td><td>Solicitud de un opositor</td><td><strong>Ámbito plataforma</strong>: <code>tenant_id</code>, <code>app_user_id</code>, mensaje, estado, quién decidió (D21)</td></tr>
+    <tr><td><code>adhesion_preparador</code></td><td>Adhesión y cuota</td><td><strong>Ámbito plataforma</strong>: temporada, tramo, estado, <code>stripe_ref</code> (D17/D19)</td></tr>
     <tr><td><code>temario</code></td><td>Temas de una oposición</td><td>Por tenant y convocatoria</td></tr>
     <tr><td><code>tema</code></td><td>Unidad de estudio</td><td>Orden, título, estado</td></tr>
     <tr><td><code>tema_version</code></td><td>Versión inmutable del contenido</td><td><code>version</code>, <code>publicado_en</code>, <code>autor_id</code></td></tr>
     <tr><td><code>tema_fuente</code></td><td>Cita de cada versión</td><td>Norma, BOE/BOJA, URL, fecha</td></tr>
+    <tr><td><code>tema_fuente_aviso</code></td><td>Norma cambiada detectada</td><td>Boletín, fecha, estado (D23)</td></tr>
+    <tr><td><code>resumen_derivado</code></td><td>Resumen por versión del tema</td><td>Cacheado por <code>tema_version</code> + <code>prompt_version</code> + modelo; <code>revisado_por</code> (D20)</td></tr>
     <tr><td><code>pregunta</code></td><td>Banco de preguntas</td><td><code>tema_id</code>, <code>enunciado</code>, <code>clave</code> fija</td></tr>
     <tr><td><code>pregunta_opcion</code></td><td>Opciones</td><td><code>es_correcta</code></td></tr>
     <tr><td><code>test</code></td><td>Examen generado</td><td><code>tema_ids</code>, <code>n_preguntas</code></td></tr>
@@ -120,9 +125,12 @@
     <tr><td><code>entrega</code></td><td>Supuesto entregado</td><td>Fichero o texto</td></tr>
     <tr><td><code>correccion</code></td><td>Corrección de una entrega</td><td><strong><code>corregido_por</code></strong>, <code>modelo</code>, <code>prompt_version</code></td></tr>
     <tr><td><code>correccion_item</code></td><td>Puntos por apartado</td><td>Trazable a <code>rubrica_item</code></td></tr>
+    <tr><td><code>ensayo_tribunal</code></td><td>Ensayo del oral con informe</td><td><code>membership_id</code>, <code>audio_ref</code>, transcripción, <code>preparador_id</code>, liquidado (D13/D15)</td></tr>
     <tr><td><code>video</code></td><td>Derivado del tema</td><td><code>tema_version_id</code>, <code>guion_sha256</code>, <code>estado</code></td></tr>
     <tr><td><code>job</code></td><td>Cola de trabajo</td><td><code>tipo</code>, <code>estado</code>, <code>intentos</code></td></tr>
     <tr><td><code>consent</code></td><td>Consentimientos y renuncia</td><td>Fecha, IP, texto versionado</td></tr>
+    <tr><td><code>plan_contratado</code></td><td>Plan del opositor o plazas del preparador</td><td><code>tenant_id</code>, <code>membership_id</code>, <code>plan</code>, temporada, <code>stripe_ref</code> (D13/D19)</td></tr>
+    <tr><td><code>consumo_plan</code></td><td>Topes de uso</td><td><code>recurso</code> (<code>ia</code>/<code>tribunal</code>/<code>paginas</code>), consumido, límite (D22)</td></tr>
     <tr><td><code>audit_log</code></td><td>Quién hizo qué</td><td>Append-only</td></tr>
   </tbody>
 </table>
@@ -159,6 +167,14 @@
 </div>
 
 <div class="fase">
+  <h3>F2.5 · Maquetación del temario <span class="sem">2 semanas</span></h3>
+  <p>Cola de render, plantilla versionada, PDF reproducible por hash, cuota de páginas por plan. El PDF nunca se edita
+  a mano: se regenera.</p>
+  <p class="acepta"><b>Aceptación:</b> dos renders del mismo tema y plantilla dan el mismo hash; el contador de páginas
+  se descuenta antes de encolar; a quien se le acaba la cuota se le dice, no se le deja esperando.</p>
+</div>
+
+<div class="fase">
   <h3>F3 · Supuestos con rúbrica <span class="sem">4 semanas</span></h3>
   <p>Enunciado, rúbrica por apartados con puntos y tolerancias, entrega de texto o fichero. Corrección asistida por
   IA contra la rúbrica; validación humana; <code>corregido_por</code>, <code>modelo</code> y
@@ -166,6 +182,14 @@
   <p class="acepta"><b>Aceptación:</b> dos correcciones de la misma entrega, mismo prompt y modelo, dan el mismo
   desglose; toda corrección indica quién la cerró; una entrega corregida solo por IA <strong>no</strong> suma a la
   nota final.</p>
+</div>
+
+<div class="fase">
+  <h3>F3.5 · Tribunal simulado <span class="sem">2 semanas</span></h3>
+  <p>Grabación del oral, transcripción, repreguntas e informe de tiempos, estructura y puntos flojos. Sin nota oficial.
+  En Máster lo escucha un preparador y firma; en Básico y Pro se etiqueta como IA.</p>
+  <p class="acepta"><b>Aceptación:</b> un ensayo de 10 minutos devuelve informe con marca de quién lo emitió; el audio
+  se borra según la política de conservación; ningún informe se presenta como nota oficial.</p>
 </div>
 
 <div class="fase">
@@ -177,15 +201,37 @@
 </div>
 
 <div class="fase">
-  <h3>F5 · Cobro y alta de preparadores <span class="sem">3 semanas</span></h3>
-  <p>Stripe Checkout, webhooks idempotentes, facturas, cupones de temporada. Checkout con clic de renuncia al
-  desistimiento (art. 103.m TRLGDCU) guardado con fecha, IP y versión del texto. Alta guiada de los 3 preparadores.</p>
-  <p class="acepta"><b>Aceptación:</b> compra de prueba con factura e IVA correctos; acceso concedido por webhook y
-  no por el retorno del navegador; consentimiento recuperable y auditable.</p>
+  <h3>F5 · Cobro y alta de preparadores <span class="sem">5 semanas</span></h3>
+  <p><strong>Dos circuitos de Stripe, y ninguno es Connect</strong>: plan del opositor (B2C: Básico, Pro y Máster) y
+  cuota del preparador (B2B, por temporada y tramos de alumnos) más las plazas que compre para sus alumnos. Topes por
+  plan (<code>consumo_plan</code>): IA, ensayos y páginas maquetadas, comprobados antes de encolar. Webhooks
+  idempotentes, facturas, cupones de temporada y clic de renuncia al desistimiento guardado con fecha, IP y versión
+  del texto. Alta guiada de los 3 preparadores con adhesión firmada.</p>
+  <p class="acepta"><b>Aceptación:</b> compra de prueba de un plan y de una cuota, factura con IVA correcto en los dos
+  casos, acceso concedido por webhook y no por el retorno del navegador, y el ensayo N+1 rechazado con un mensaje
+  claro y no con un error del proveedor.</p>
 </div>
 
-<p><strong>Total: 18 semanas.</strong> Con un solo desarrollador y sin imprevistos, arrancar el 1-dic-2026 lleva a
- principios de abril de 2027, con margen hasta septiembre.</p>
+<div class="fase">
+  <h3>F5.5 · Alta pública <span class="sem">2 semanas</span></h3>
+  <p><code>/registro</code> con correo verificado, creación del espacio personal y de su <code>membership</code> en una
+  sola transacción. Sin plan no se abre ningún módulo. Límite de intentos por IP y por correo, más captcha.</p>
+  <p class="acepta"><b>Aceptación:</b> un alta desde el móvil deja al opositor dentro en menos de dos minutos; el mismo
+  correo no crea dos cuentas; sin correo verificado no se entra.</p>
+</div>
+
+<div class="fase">
+  <h3>F6 · Nexo opositor–preparador <span class="sem">2 semanas</span></h3>
+  <p>Ámbito <code>plataforma</code> con tablas propias: <code>perfil_preparador</code> y <code>solicitud_plaza</code>.
+  Perfil opt-in revisado por WinOpo, datos de contacto ocultos hasta la aceptación, solicitud → aceptación →
+  <code>membership</code>. Sin chat, sin comisión, sin valoraciones y sin carrito.</p>
+  <p class="acepta"><b>Aceptación:</b> el correo del opositor no aparece en ningún HTML público; al aceptar entra en el
+  tenant del preparador; al desvincularse conserva su espacio personal y su historial; ninguna consulta del ámbito
+  plataforma devuelve datos de alumnos.</p>
+</div>
+
+<p><strong>Total: 28 semanas.</strong> Con un solo desarrollador y sin imprevistos, arrancar el 1-dic-2026 lleva a
+ mediados de junio de 2027, con margen hasta septiembre.</p>
 
 <h2>6. Entornos y CI</h2>
 <table>
@@ -237,6 +283,11 @@
   <li>Stripe Checkout con <code>client_reference_id</code> = <code>membership_id</code>; el acceso se concede
   <strong>por webhook</strong>, nunca por el retorno del navegador.</li>
   <li>Webhooks idempotentes por <code>event.id</code> en tabla propia.</li>
+  <li><strong>Dos productos distintos</strong> (D19): plan del opositor y cuota del preparador por temporada y tramo de
+  alumnos, más las plazas que compre para sus alumnos. <strong>Sin Stripe Connect, sin comisión y sin payout</strong>:
+  WinOpo no cobra por cuenta de nadie.</li>
+  <li>La cuota del preparador <strong>no se cobra por contacto</strong>: cobrar el lead es el incentivo máximo para
+  fugarse (D21).</li>
   <li>Factura con IVA español; si el asesor confirma exención de enseñanza, se configura y se documenta.</li>
   <li>Renuncia al desistimiento: casilla obligatoria, texto versionado, fecha e IP.</li>
   <li>Reembolsos manuales en v0, con registro en <code>audit_log</code>.</li>
