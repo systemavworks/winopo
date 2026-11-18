@@ -10,7 +10,8 @@ Queda fuera de este runbook: los secretos de SSH del workflow «Desplegar» (los
 a mano por SSH) y las cuentas de R2, Stripe, IA y SMTP, que siguen vacías.
 
 Este runbook publica WinOpo **en la misma caja que Komanda**, aislado y sin tocar su borde. Se ejecuta
-una vez; después se despliega con el workflow (§6).
+una vez; después se despliega por SSH con `infra/scripts/deploy.sh` (§5) o con el workflow «Desplegar»
+cuando tenga sus secretos (§6).
 
 ## 0. Dónde vive cada cosa
 
