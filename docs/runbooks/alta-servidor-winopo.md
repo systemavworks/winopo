@@ -78,6 +78,13 @@ hubo que crearlo. El primer clon se hizo con el usuario `komanda` y se pasó a `
 (`chown -R winopo:winopo /opt/winopo` + clave propia) para que la clave de despliegue de WinOpo no quedara
 en el home de Komanda, junto a su `.env`.
 
+Y ojo con esto: el `sshd` de la caja está endurecido por Komanda con `AllowUsers komanda`
+(`/etc/ssh/sshd_config.d/99-komanda.conf`). Sin añadir `winopo` ahí, la clave no sirve para nada: el login
+responde `Permission denied (publickey)` aunque `authorized_keys` esté perfecto. El 18-nov-2026 se dejó en
+`AllowUsers komanda winopo`, con copia previa en `99-komanda.conf.bak-winopo-20261118`, `sshd -t` antes de
+recargar y `systemctl reload ssh` (recargar no corta sesiones abiertas). Si Komanda reescribe ese fichero,
+hay que volver a añadirlo.
+
 `docker` equivale a `root`: quien esté en ese grupo puede montar `/` dentro de un contenedor. Aquí se
 acepta porque `winopo` es un usuario de despliegue al que solo entra el workflow con su clave dedicada.
 Si se quiere lo estricto, se le quita el grupo y se arranca con una unidad de systemd `User=root` y
@@ -363,5 +370,6 @@ los registros con `tools/dns-cloudflare.sh --ip <nueva IP>` y se borran los host
 | Komanda lento tras el despliegue | `free -m`, `docker stats` | build sin `nice`, o techos coincidiendo: §8 |
 | `psql: ... No such file or directory` en el primer despliegue | paso 2/5 | Postgres aún no escuchaba: el script ya espera con `pg_isready` |
 | `worker` en «unhealthy» con `worker arrancado` en el log | `docker inspect` | el `HEALTHCHECK` de la imagen sondea 8080 y el perfil `worker` no abre puerto: `healthcheck: disable: true` en el compose |
+| `Permission denied (publickey)` al entrar como `winopo` | `sshd_config.d/99-komanda.conf` | falta `winopo` en `AllowUsers`: §1 |
 | `Host key verification failed` al hacer `git fetch` como `winopo` | `/home/winopo/.ssh/known_hosts` | falta la huella de `github.com`: §2 |
 | `10000 Authentication error` al crear el túnel | `npx wrangler login` | el token del `.env` solo tiene `Cloudflare Tunnel: Read`: §3 |
