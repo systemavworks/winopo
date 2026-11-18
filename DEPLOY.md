@@ -51,20 +51,29 @@ porque Caddy saca el certificado por HTTP-01.
 ### DNS
 
 Los registros se aplican con un script idempotente, no a mano en el panel. En la caja compartida el modo es
-**túnel**: los CNAME los crea el propio túnel al declarar los hostnames públicos, y el script solo limpia
-los restos muertos de Pages.
+**túnel**: los tres nombres quedan en CNAME proxied al túnel.
 
 ```bash
-tools/dns-cloudflare.sh --tunnel            # simulación: enseña qué borraría
-tools/dns-cloudflare.sh --tunnel --apply    # borra `*.winopo.es` y `www` si apuntan a pages.dev
+tools/dns-cloudflare.sh --tunnel            # simulación: enseña el cambio
+tools/dns-cloudflare.sh --tunnel --apply    # aplica
 ```
+
+| Nombre | Tipo | Valor |
+|---|---|---|
+| `winopo.es` | CNAME proxied | `<uuid>.cfargotunnel.com` |
+| `www.winopo.es` | CNAME proxied | `<uuid>.cfargotunnel.com` |
+| `app.winopo.es` | CNAME proxied | `<uuid>.cfargotunnel.com` |
+
+El apex admite CNAME porque va proxied: Cloudflare lo achata. El script borra además el comodín muerto
+`*.winopo.es` y reapunta `www`, que apuntaban a `winopo.pages.dev`, un proyecto que ya no existe y devolvía
+`error code: 1014` en todo subdominio. No toca el `TXT` del SPF ni los `MX`.
+
+Si el túnel no existe en la cuenta, el script sale con **2** sin escribir: un CNAME a `cfargotunnel` sin
+túnel detrás solo convierte el 1014 en un NXDOMAIN. Y con el túnel creado, el DNS no basta: hacen falta los
+tres hostnames dentro del túnel apuntando a `HTTP caddy:80`, o `cloudflared` responde 404.
 
 Hostnames públicos a declarar en Zero Trust → Tunnels → `winopo-cax11` (los tres al servicio
 `HTTP caddy:80`): `winopo.es`, `www.winopo.es`, `app.winopo.es`.
-
-El script borra además los restos de Cloudflare Pages: `*.winopo.es` y `www` apuntaban a
-`winopo.pages.dev`, un proyecto que ya no existe, y Cloudflare respondía `error code: 1014` en todo
-subdominio. No toca el `TXT` del SPF ni los `MX`.
 
 Con **IP propia** el modo es el otro, y deja registros en gris (Cloudflare no proxifica: Caddy gestiona el
 certificado por HTTP-01; en naranja solo tendría sentido con modo SSL "Full strict" y Origin CA):

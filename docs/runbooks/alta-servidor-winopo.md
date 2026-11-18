@@ -144,17 +144,34 @@ No se guarda en git ni se pega en un chat.
 
 ## 4. DNS (Cloudflare)
 
-El token `API_TOKEN_CLOUDFLARE` del `.env` solo tiene `Zone.DNS:Edit`: suficiente para limpiar, no para
-crear los CNAME (los crea el túnel). El script simula por defecto:
+`API_TOKEN_CLOUDFLARE` del `.env` necesita `Zone.DNS:Edit` sobre `winopo.es` y, para encontrar el túnel por
+nombre, `Account → Cloudflare Tunnel → Read`. El script simula por defecto:
 
 ```bash
-tools/dns-cloudflare.sh --tunnel            # enseña qué borraría
-tools/dns-cloudflare.sh --tunnel --apply    # borra restos muertos de Pages
+tools/dns-cloudflare.sh --tunnel                      # enseña el cambio
+tools/dns-cloudflare.sh --tunnel --apply              # aplica
+tools/dns-cloudflare.sh --tunnel --tunnel-id <uuid>   # si el token no puede listar túneles
 ```
 
-Deja intactos el `TXT` del SPF, los `MX` y cualquier registro que no apunte a `pages.dev`. El proyecto
-Pages muerto no se puede borrar desde aquí (el token no tiene permiso de Pages): se hace en el panel,
-y no estorba.
+Deja los tres nombres del producto en CNAME *proxied* a `<uuid>.cfargotunnel.com`:
+
+| Nombre | Tipo | Valor |
+|---|---|---|
+| `winopo.es` | CNAME proxied | `<uuid>.cfargotunnel.com` |
+| `www.winopo.es` | CNAME proxied | `<uuid>.cfargotunnel.com` |
+| `app.winopo.es` | CNAME proxied | `<uuid>.cfargotunnel.com` |
+
+El apex admite CNAME porque va proxied: Cloudflare lo achata. El script borra además el comodín muerto
+`*.winopo.es` (apuntaba a `winopo.pages.dev`, un proyecto que ya no existe, y devolvía `error 1014` en todo
+subdominio), reapunta `www` en vez de borrarlo, y no toca el `TXT` del SPF ni los `MX`.
+
+Si el túnel todavía no existe, el script sale con **2** y no escribe nada: un CNAME a `cfargotunnel` sin
+túnel detrás solo cambia el 1014 por un NXDOMAIN. Crearlo necesita `Account → Cloudflare Tunnel → Edit`,
+que este token no tiene: se hace una vez en el panel (§3).
+
+Ojo: el DNS solo no publica. El túnel necesita dentro los tres hostnames apuntando a `HTTP caddy:80`; si
+falta uno, `cloudflared` contesta 404 aunque el registro esté perfecto. El proyecto de Pages muerto se borra
+desde el panel (`Pages → Edit`) y no estorba.
 
 Comprobar cuando el túnel esté conectado:
 

@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Registros DNS de winopo.es en Cloudflare. Dos modos:
 #
-#   --tunnel   (el de producción hoy) La entrada es un Cloudflare Tunnel: los CNAME los
-#              crea el propio túnel al declarar los hostnames públicos. Este script solo
-#              borra los restos muertos de Pages y recuerda qué hostnames declarar.
+#   --tunnel   (el de producción hoy) La entrada es un Cloudflare Tunnel: deja winopo.es,
+#              www.winopo.es y app.winopo.es en CNAME proxied al <id>.cfargotunnel.com del
+#              túnel, que es lo que hace que el tráfico llegue al caddy interno de la caja.
+#              El túnel se busca por nombre (`winopo-cax11`); si el token no puede listar
+#              túneles, pásalo a mano con --tunnel-id. Sin túnel no se toca el DNS: sale
+#              con 2 y dice qué falta, para no dejar la zona a medias.
 #
 #   --ip IP    Caja dedicada con IP pública: deja winopo.es y app.winopo.es en A (gris) y
 #              www en CNAME al apex, para que Caddy saque el certificado por HTTP-01.
@@ -14,13 +17,16 @@
 # Idempotente: dos ejecuciones seguidas con el mismo destino no cambian nada la segunda.
 #
 #   tools/dns-cloudflare.sh --tunnel                      # simulación del modo túnel
-#   tools/dns-cloudflare.sh --tunnel --apply              # borra restos de Pages
+#   tools/dns-cloudflare.sh --tunnel --apply              # limpia Pages y apunta al túnel
+#   tools/dns-cloudflare.sh --tunnel --tunnel-id <uuid>   # sin permiso para listar túneles
 #   tools/dns-cloudflare.sh --ip 203.0.113.10             # caja propia (IP de ejemplo, RFC 5737)
 #   tools/dns-cloudflare.sh --ip 203.0.113.10 --apply
 #
 # Token: API_TOKEN_CLOUDFLARE en el entorno, o en .env en la raíz del repositorio.
-# Solo necesita Zone.DNS:Edit sobre winopo.es. Nada más (ni Pages, ni cuenta): el proyecto
-# de Pages muerto se borra desde el panel, no desde aquí.
+# Zone.DNS:Edit sobre winopo.es y, para encontrar el túnel por nombre, Account →
+# Cloudflare Tunnel → Read. Crear el túnel es otra cosa: eso se hace una vez en el panel
+# (o con un token que tenga Tunnel → Edit) y el proyecto de Pages muerto se borra desde
+# el panel, que aquí no hay permiso de Pages.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -30,6 +36,8 @@ MODO=""            # tunnel | ip. Obligatorio y explícito: el script escribe en
 APLICAR=0
 PROXIED="false"
 CON_STAGING=0
+TUNEL="winopo-cax11"   # nombre del túnel en Zero Trust → Networks → Tunnels
+TUNEL_ID_USER=""
 API="https://api.cloudflare.com/client/v4"
 
 # Ayuda = todas las líneas de comentario entre el shebang y `set -euo pipefail`.
@@ -41,6 +49,7 @@ uso() {
 while [ $# -gt 0 ]; do
   case "$1" in
     --tunnel)  CON_TUNNEL=1; shift ;;
+    --tunnel-id) CON_TUNNEL=1; TUNEL_ID_USER="${2:-}"; shift 2 ;;
     --ip)      CON_IP=1; IP="${2:-}"; shift 2 ;;
     --apply)   APLICAR=1; shift ;;
     --proxied) PROXIED="true"; shift ;;
@@ -105,10 +114,50 @@ if [ -z "$ZID" ]; then
   echo "La zona $DOMINIO no está en esta cuenta." >&2; exit 1
 fi
 
+if [ "$MODO" = "tunnel" ]; then
+  # El CNAME tiene que apuntar al túnel concreto: sin túnel no hay destino y tocar el DNS
+  # solo cambiaría un error 1014 (Pages borrado) por un NXDOMAIN. Se resuelve antes de
+  # escribir nada, por eso el script puede abortar sin dejar la zona a medias.
+  TUNEL_ID="$TUNEL_ID_USER"
+  if [ -z "$TUNEL_ID" ]; then
+    AID=$(api GET "/zones/$ZID" | jq -r '.result.account.id // empty')
+    if [ -z "$AID" ]; then
+      echo "No se pudo leer la cuenta de la zona $DOMINIO." >&2; exit 1
+    fi
+    respuesta=$(api GET "/accounts/$AID/cfd_tunnel?is_deleted=false")
+    if [ "$(printf '%s' "$respuesta" | jq -r '.success')" != "true" ]; then
+      printf '%s' "$respuesta" | jq -r '.errors[]? | "Cloudflare: \(.code) \(.message)"' >&2
+      echo "El token no puede listar túneles: repite con --tunnel-id <uuid>." >&2
+      exit 2
+    fi
+    TUNEL_ID=$(printf '%s' "$respuesta" \
+      | jq -r --arg n "$TUNEL" '[.result[] | select(.name==$n)][0].id // empty')
+  fi
+  if [ -z "$TUNEL_ID" ]; then
+    cat >&2 <<FIN
+No hay túnel «$TUNEL» en la cuenta. Un CNAME a cfargotunnel sin túnel detrás no lleva a
+ninguna parte, así que no se toca el DNS.
+
+Crear el túnel, una sola vez:
+  Zero Trust → Networks → Tunnels → Create a tunnel → Cloudflared → nombre «$TUNEL»
+
+Luego, o declaras los hostnames públicos en el panel (el túnel crea los CNAME él solo),
+o vuelves aquí y los pone este script:
+  tools/dns-cloudflare.sh --tunnel --apply
+
+Lo que hay dentro del túnel, si lo prefieres por API:
+  winopo.es / www.winopo.es / app.winopo.es → HTTP  caddy:80
+FIN
+    exit 2
+  fi
+  DESTINO="$TUNEL_ID.cfargotunnel.com"
+  PROXIED=true
+fi
+
 if [ "$MODO" = "ip" ]; then
   echo "Zona $DOMINIO ($ZID) · modo: caja propia · IP $IP · proxied=$PROXIED"
 else
-  echo "Zona $DOMINIO ($ZID) · modo: túnel (los CNAME los crea Cloudflare Zero Trust)"
+  echo "Zona $DOMINIO ($ZID) · modo: túnel «$TUNEL» ($TUNEL_ID) · CNAME -> $DESTINO"
 fi
 echo "Ejecución: $([ "$APLICAR" -eq 1 ] && echo APLICAR || echo SIMULACIÓN)"
 echo
@@ -216,28 +265,15 @@ if [ "$MODO" = "ip" ]; then
   poner_a "app.$DOMINIO"
   if [ "$CON_STAGING" -eq 1 ]; then poner_a "staging.$DOMINIO"; fi
 else
-  echo "2) Dominios del producto: los crea el túnel, aquí solo se limpian restos"
-  # Lo que el túnel va a necesitar como hostname público. Si el registro existe y apunta
-  # a pages.dev está muerto (error 1014) y estorba: se borra. Si apunta a otra cosa, se deja
-  # y se avisa: puede ser un servicio que alguien montó a mano.
-  for nombre in "$DOMINIO" "www.$DOMINIO" "app.$DOMINIO"; do
-    tipo=$(tipo_actual "$nombre")
-    if [ -z "$tipo" ]; then
-      echo "  $nombre: sin A/CNAME · lo creará el túnel"
-      continue
-    fi
-    contenido=$(registros | jq -r --arg n "$nombre" '[.result[] | select(.name==$n)][0].content')
-    case "$contenido" in
-      *pages.dev*)
-        id=$(existente "$nombre" "$tipo")
-        echo "  $nombre: $tipo -> $contenido (muerto) · se borra para que lo cree el túnel"
-        mutar "borrar $nombre" DELETE "/zones/$ZID/dns_records/$id" ;;
-      *)
-        echo "  $nombre: $tipo -> $contenido · ya existe, no se toca. El túnel reutiliza el hostname" ;;
-    esac
-  done
+  echo "2) Dominios del producto -> túnel $TUNEL"
+  # El apex como CNAME a cfargotunnel vale porque va proxied: Cloudflare lo achata. Y
+  # `poner_cname` reapunta lo que hubiera en vez de borrar y crear, así que un registro
+  # montado a mano se corrige sin perder el nombre.
+  poner_cname "$DOMINIO" "$DESTINO"
+  poner_cname "www.$DOMINIO" "$DESTINO"
+  poner_cname "app.$DOMINIO" "$DESTINO"
   if [ "$CON_STAGING" -eq 1 ]; then
-    echo "  staging.$DOMINIO: añadirlo también como hostname público si hace falta"
+    echo "  staging.$DOMINIO: se omite; staging no corre en la caja compartida (publica 80/443)"
   fi
 fi
 echo
@@ -248,17 +284,21 @@ echo
 
 if [ "$MODO" = "tunnel" ]; then
   cat <<'FIN'
-Lo que este token no puede hacer y hay que hacer en el panel:
+El DNS va por aquí, pero un CNAME al túnel solo sirve si el túnel tiene dentro esos
+hostnames. Eso es configuración del túnel (Zero Trust), no de la zona:
 
-  1. Zero Trust → Networks → Tunnels → crear `winopo-cax11` y copiar el token.
-     Ese token es TUNNEL_TOKEN en el .env del servidor.
-  2. En el túnel → Public hostname, tres entradas al mismo servicio:
-       winopo.es      → HTTP  caddy:80
-       www.winopo.es  → HTTP  caddy:80
-       app.winopo.es  → HTTP  caddy:80
-     `caddy` resuelve por la red winopo_default: cloudflared y caddy van en el mismo
-     proyecto Compose. El túnel crea los CNAME en proxied y el apex por CNAME flattening.
-  3. El proyecto Pages muerto no se puede borrar desde aquí (el token no tiene Pages).
+  Tunnels → winopo-cax11 → Public hostname, tres entradas al mismo servicio:
+    winopo.es      → HTTP  caddy:80
+    www.winopo.es  → HTTP  caddy:80
+    app.winopo.es  → HTTP  caddy:80
+
+  `caddy` resuelve por la red winopo_default: cloudflared y caddy van en el mismo proyecto
+  Compose. Si el hostname no está en el túnel, cloudflared contesta 404 aunque el DNS esté
+  perfecto.
+
+Y dos cosas que este token no puede hacer y no hacen falta para publicar:
+  · crear el túnel (necesita Account → Cloudflare Tunnel → Edit);
+  · borrar el proyecto de Pages muerto (necesita Pages → Edit), que se va desde el panel.
 FIN
   echo
 fi
