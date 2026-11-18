@@ -23,6 +23,10 @@ Ver [`docs/infra-servidor.md`](../docs/infra-servidor.md). Resumen: la caja actu
  aloja Komanda y Billka. WinOpo va a **caja propia** (CAX21 recomendada) para no compartir memoria, red interna ni
  base de datos con los otros dos productos.
 
+El alta paso a paso (endurecer, DNS, secretos, primer despliegue, despliegue desde GitHub) está en
+[`docs/runbooks/alta-servidor-winopo.md`](../docs/runbooks/alta-servidor-winopo.md). El DNS se aplica con
+`tools/dns-cloudflare.sh`, que **simula por defecto** y solo escribe con `--apply`.
+
 ## Aviso ARM64
 
 Las imágenes deben ser multi-arch. Si se añade una dependencia con librería nativa (por ejemplo Argon2), comprobar

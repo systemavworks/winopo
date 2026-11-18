@@ -12,7 +12,8 @@
 | Staging | `staging.winopo.es` | `infra/docker-compose.staging.yml` | datos sintéticos |
 | Producción | `winopo.es` (landing) + `app.winopo.es` (plataforma) | `infra/docker-compose.prod.yml` | datos reales |
 
-El despliegue es **manual por SSH** con un script. No hay CI/CD hacia el servidor todavía (ver §13).
+El despliegue es **manual por SSH** con un script. El workflow **Desplegar** (`.github/workflows/deploy.yml`)
+lo lanza desde GitHub, pero solo cuando se le da a *Run workflow*: no despliega en cada push.
 Cinco contenedores: `db`, `core`, `worker`, `web`, `caddy`. La misma imagen de `core` sirve los dos perfiles.
 
 ## 1. Antes del primer despliegue
@@ -41,6 +42,13 @@ no se abre el puerto.
 
 ### DNS
 
+Los registros se aplican con un script idempotente, no a mano en el panel:
+
+```bash
+tools/dns-cloudflare.sh --ip <IP_DE_LA_CAJA>          # simulación: enseña qué cambiaría
+tools/dns-cloudflare.sh --ip <IP_DE_LA_CAJA> --apply  # escribe en Cloudflare
+```
+
 En el registrador (o en Cloudflare, con los registros en gris si se quiere que Caddy gestione el
 certificado; en naranja solo si el modo SSL es "Full strict"):
 
@@ -52,6 +60,12 @@ certificado; en naranja solo si el modo SSL es "Full strict"):
 | `staging.winopo.es` | A | IP del servidor (o de otro, si se separa) |
 
 El apex **no puede ser CNAME** (regla del DNS). Por eso `winopo.es` es un registro `A`.
+El script borra además los restos de Cloudflare Pages: `*.winopo.es` y `www` apuntaban a
+`winopo.pages.dev`, un proyecto que ya no existe, y Cloudflare respondía `error code: 1014` en todo
+subdominio. No toca el `TXT` del SPF ni los `MX`.
+
+Pasos completos, con el orden correcto (endurecer la caja → DNS → secretos → despliegue):
+[`docs/runbooks/alta-servidor-winopo.md`](docs/runbooks/alta-servidor-winopo.md).
 Comprobar antes de desplegar, porque Let's Encrypt necesita resolver ya:
 
 ```bash
@@ -298,7 +312,7 @@ Enumerado para que nadie lo dé por hecho:
 
 | Tema | Estado |
 |---|---|
-| CI/CD hacia el servidor | no existe: CI valida (build, tests, migraciones, contratos) pero no despliega |
+| CI/CD hacia el servidor | manual: workflow **Desplegar** por SSH + `deploy.sh`; no se dispara en cada push |
 | Copias programadas | script listo, `cron`/temporizador **sin configurar** |
 | Monitorización y alertas | nada: ni Uptime Kuma, ni alertas de disco, ni de memoria |
 | Rotación de logs | la de Docker por defecto; sin límite configurado |

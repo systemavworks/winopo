@@ -1,0 +1,93 @@
+name: Desplegar
+
+# Manual a propósito. El despliegue recrea contenedores en producción y el proyecto no
+# quiere despliegues automáticos en cada push: se lanza desde Actions > Desplegar.
+#
+# Secretos (Settings > Secrets and variables > Actions):
+#   SSH_HOST          IP o nombre de la caja de WinOpo
+#   SSH_USER          usuario sin privilegios extra (grupo docker), nunca root
+#   SSH_KEY           clave privada ed25519 dedicada a despliegues
+#   SSH_KNOWN_HOSTS   salida de `ssh-keyscan -H $SSH_HOST` (fija la huella, no se confía a ciegas)
+#   DEPLOY_PATH       ruta del repositorio en el servidor (por defecto /srv/winopo)
+#
+# En el servidor, el repositorio necesita una deploy key de solo lectura para `git fetch`.
+on:
+  workflow_dispatch:
+    inputs:
+      entorno:
+        description: Entorno a desplegar
+        required: true
+        default: prod
+        type: choice
+        options: [prod, staging]
+      ref:
+        description: Rama o etiqueta exacta a desplegar
+        required: true
+        default: main
+
+concurrency:
+  group: desplegar-${{ inputs.entorno }}
+  cancel-in-progress: false
+
+jobs:
+  desplegar:
+    # Permite exigir aprobación manual en Settings > Environments.
+    environment: ${{ inputs.entorno }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Comprobar secretos
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          for variable in SSH_HOST SSH_USER SSH_KEY SSH_KNOWN_HOSTS; do
+            if [ -z "${!variable}" ]; then
+              echo "Falta el secreto $variable" >&2
+              exit 1
+            fi
+          done
+
+      - name: Preparar SSH
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Desplegar en el servidor
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          ENTORNO: ${{ inputs.entorno }}
+          REF: ${{ inputs.ref }}
+        run: |
+          ssh -o IdentitiesOnly=yes -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+            "DEPLOY_PATH='${DEPLOY_PATH:-/srv/winopo}' ENTORNO='$ENTORNO' REF='$REF' bash -s" <<'REMOTO'
+          set -euo pipefail
+          cd "$DEPLOY_PATH"
+
+          # Se despliega un commit concreto, no lo que haya en el directorio de trabajo.
+          # `.env` no está en git: sobrevive al checkout y a reset --hard.
+          git fetch --prune --tags origin
+
+          # origin/<ref> y no <ref>: la rama local puede estar desfasada respecto al remoto.
+          if git rev-parse --verify --quiet "origin/$REF^{commit}" >/dev/null; then
+            DESTINO="origin/$REF"
+          elif git rev-parse --verify --quiet "$REF^{commit}" >/dev/null; then
+            DESTINO="$REF"   # etiqueta o SHA suelto
+          else
+            echo "No existe '$REF' en el remoto." >&2
+            exit 1
+          fi
+
+          git checkout --detach "$DESTINO"
+          echo "==> Commit: $(git log -1 --oneline)"
+
+          infra/scripts/deploy.sh "$ENTORNO"
+          REMOTO

@@ -31,7 +31,7 @@ core/        Backend Kotlin + Ktor (API /v1, worker de jobs)
 migrations/  SQL versionado, RLS forzado
 web/         Next.js + TypeScript (app.winopo.es)
 landing/     HTML estático de winopo.es (sin build, sin JS; marca en landing/assets)
-tools/       Utilidades de desarrollo (generación de la marca del landing)
+tools/       Utilidades de desarrollo (marca del landing, DNS de Cloudflare)
 infra/       Compose local/staging/prod, Caddy
 contracts/   Esquemas JSON compartidos
 tests/e2e/   Playwright
@@ -44,8 +44,9 @@ docs/        Alcance, plan, decisiones, marca, legal, runbooks
 |---|---|
 | [`ARCHITECTURE.md`](ARCHITECTURE.md) | cómo está montado: componentes, multi-tenant, sesión, contrato de API, qué no existe todavía |
 | [`DEPLOY.md`](DEPLOY.md) | desplegar en el servidor: DNS, secretos, migraciones, rollback, copias |
+| [`docs/runbooks/alta-servidor-winopo.md`](docs/runbooks/alta-servidor-winopo.md) | alta de la caja: endurecer, DNS, secretos, primer despliegue y despliegue desde GitHub |
 | [`winopo_roadmap.html`](winopo_roadmap.html) | hoja de ruta viva por fases |
-| [`docs/decisiones.md`](docs/decisiones.md) | D1–D16 y el porqué de cada una |
+| [`docs/decisiones.md`](docs/decisiones.md) | D1–D24 y el porqué de cada una |
 | [`docs/alcance-v0.md`](docs/alcance-v0.md) | qué se vende y qué no |
 
 ## Arrancar en local
@@ -67,7 +68,7 @@ API en `http://localhost:8080`, web en `http://localhost:3000`.
 
 ## Decisiones que conviene leer antes de tocar código
 
-- `docs/decisiones.md` — D1 a D23. Sin contexto de tenant no se ve una fila (RLS forzada); la sesión guarda el
+- `docs/decisiones.md` — D1 a D24. Sin contexto de tenant no se ve una fila (RLS forzada); la sesión guarda el
   hash del token, no el token; la maquetación genera un PDF reproducible y nunca se edita a mano; hay **un tenant por
   preparador** y el opositor es un rol, con espacio personal si va por su cuenta (D12 corregida); tres ámbitos:
   `tenant`, `plataforma` y `admin` (D18); y se cobra a los dos lados sin comisión (D19).
