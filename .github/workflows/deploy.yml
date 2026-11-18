@@ -8,7 +8,7 @@ name: Desplegar
 #   SSH_USER          usuario sin privilegios extra (grupo docker), nunca root
 #   SSH_KEY           clave privada ed25519 dedicada a despliegues
 #   SSH_KNOWN_HOSTS   salida de `ssh-keyscan -H $SSH_HOST` (fija la huella, no se confía a ciegas)
-#   DEPLOY_PATH       ruta del repositorio en el servidor (por defecto /srv/winopo)
+#   DEPLOY_PATH       ruta del repositorio en el servidor (por defecto /opt/winopo)
 #
 # En el servidor, el repositorio necesita una deploy key de solo lectura para `git fetch`.
 on:
@@ -68,7 +68,7 @@ jobs:
           REF: ${{ inputs.ref }}
         run: |
           ssh -o IdentitiesOnly=yes -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
-            "DEPLOY_PATH='${DEPLOY_PATH:-/srv/winopo}' ENTORNO='$ENTORNO' REF='$REF' bash -s" <<'REMOTO'
+            "DEPLOY_PATH='${DEPLOY_PATH:-/opt/winopo}' ENTORNO='$ENTORNO' REF='$REF' bash -s" <<'REMOTO'
           set -euo pipefail
           cd "$DEPLOY_PATH"
 

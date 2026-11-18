@@ -1,10 +1,13 @@
 # Runbook · Alta de WinOpo en la caja compartida (CAX11)
 
-**Estado a 18-nov-2026: el landing ya está publicado en `winopo.es` y `www.winopo.es`** (Worker de
-Cloudflare con assets, `ok` verificado byte a byte contra `landing/index.html`). La zona está limpia: se
-borraron el comodín `*.winopo.es` y los CNAME a `winopo.pages.dev`, que devolvían `error code: 1014`.
-Falta **`app.winopo.es`**: la plataforma todavía no está desplegada en la caja, así que ese nombre no
-resuelve a propósito (el comodín muerto ya no existe).
+**Estado a 18-nov-2026: publicado y en servicio.** `winopo.es` y `www.winopo.es` los sirve el Worker de
+Cloudflare (`ok` verificado byte a byte contra `landing/index.html`); `app.winopo.es` resuelve por el edge
+y entra por el túnel `winopo-cax11` a la caja compartida: proyecto Compose `winopo`, seis contenedores y
+ningún puerto publicado. Medido desde fuera ese día: `200` en `/` (18 296 b), `200` en `/login`, `200` en
+`/healthz`, HSTS presente, `server: cloudflare` y cuatro conexiones del túnel.
+
+Queda fuera de este runbook: los secretos de SSH del workflow «Desplegar» (los despliegues de hoy se hacen
+a mano por SSH) y las cuentas de R2, Stripe, IA y SMTP, que siguen vacías.
 
 Este runbook publica WinOpo **en la misma caja que Komanda**, aislado y sin tocar su borde. Se ejecuta
 una vez; después se despliega con el workflow (§6).
@@ -17,7 +20,7 @@ una vez; después se despliega con el workflow (§6).
 | `app.billka.es` | Cloudflare Workers (`billka-app`) | Publicado · no se toca |
 | `api.billka.es` + su Postgres | esta caja, previsto en `billka/docs/runbook/despliegue-en-caja-compartida.md` | **Propuesta, sin ejecutar** |
 | `winopo.es` + `www` | Cloudflare Workers (`winopo`), `landing/` del repositorio | **Publicado** |
-| `app.winopo.es` | esta caja, `/srv/winopo`, sin puertos, entrada por Cloudflare Tunnel | Este runbook |
+| `app.winopo.es` | esta caja, `/opt/winopo`, sin puertos, entrada por Cloudflare Tunnel | **Publicado** · este runbook |
 
 Medido el 18-nov-2026 con `free -m`, `df -h /`, `docker stats` y `uptime`:
 
@@ -27,7 +30,7 @@ Medido el 18-nov-2026 con `free -m`, `df -h /`, `docker stats` y `uptime`:
 | Disco | 38 G · **27 G libres (27 % usado)** |
 | Carga | 0.14 en 2 vCPU, 13 días de uptime |
 | Komanda | caddy 23 MiB · core 203 · web 97 · postgres 57 → **≈ 380 MiB** |
-| `/srv` | vacío: WinOpo es el primer ocupante |
+| `/opt` | `komanda` (ya estaba) y `winopo`: usuario propio desde el 18-nov-2026 |
 
 **Criterio de corte**, el mismo del runbook de Billka (ADR `B0009`), antes de arrancar:
 
@@ -70,6 +73,11 @@ install -d -m 700 -o winopo -g winopo /home/winopo/.ssh
 # pegar aquí la clave pública de despliegue (no la personal) en authorized_keys, 600 y dueño winopo
 ```
 
+En la caja real (18-nov-2026) el usuario `winopo` **ya existía** (uid 1001, ya en el grupo `docker`): no
+hubo que crearlo. El primer clon se hizo con el usuario `komanda` y se pasó a `winopo` el mismo día
+(`chown -R winopo:winopo /opt/winopo` + clave propia) para que la clave de despliegue de WinOpo no quedara
+en el home de Komanda, junto a su `.env`.
+
 `docker` equivale a `root`: quien esté en ese grupo puede montar `/` dentro de un contenedor. Aquí se
 acepta porque `winopo` es un usuario de despliegue al que solo entra el workflow con su clave dedicada.
 Si se quiere lo estricto, se le quita el grupo y se arranca con una unidad de systemd `User=root` y
@@ -89,23 +97,34 @@ El incidente real y cómo se sale de él están en `komanda/docs/RUNBOOK.md` §3
 
 El swap de 2 GB que ya tiene la caja no arregla un OOM, pero evita que el kernel elija víctima al azar.
 
-## 2. Código y secretos en `/srv/winopo`
+## 2. Código y secretos en `/opt/winopo`
 
 ```bash
-sudo install -d -o winopo -g winopo -m 750 /srv/winopo
+sudo install -d -o winopo -g winopo -m 750 /opt/winopo
 sudo -u winopo -H ssh-keygen -t ed25519 -C "deploy@winopo" -f /home/winopo/.ssh/winopo_deploy -N ''
 sudo -u winopo cat /home/winopo/.ssh/winopo_deploy.pub
 # -> Settings > Deploy keys del repositorio, SOLO LECTURA
 ```
 
 ```bash
-sudo -u winopo -H git clone git@github.com:systemavworks/winopo.git /srv/winopo
-cd /srv/winopo
+sudo -u winopo -H git clone git@github.com:systemavworks/winopo.git /opt/winopo
+cd /opt/winopo
 # El workflow hace `git fetch` después: la clave tiene que estar configurada en el repo, no
 # solo en el `clone`. Esto es lo que evita el fallo de credenciales en el segundo despliegue.
 git config core.sshCommand "ssh -i /home/winopo/.ssh/winopo_deploy -o IdentitiesOnly=yes"
 git fetch --dry-run origin && echo "fetch OK"
 ```
+
+```bash
+# Sin known_hosts, el primer `git fetch` muere con «Host key verification failed». Se fija la huella
+# que publica GitHub en vez de aceptar la primera que llegue:
+sudo -u winopo ssh-keyscan -t ed25519 github.com > /tmp/gh_ed
+ssh-keygen -lf /tmp/gh_ed     # tiene que imprimir SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU
+sudo install -o winopo -g winopo -m 600 /tmp/gh_ed /home/winopo/.ssh/known_hosts
+```
+
+La misma clave pública va en *Settings > Deploy keys* (solo lectura, para `git fetch`) y en
+`/home/winopo/.ssh/authorized_keys` (para que el workflow entre por SSH como `winopo`).
 
 ```bash
 cp .env.example .env && chmod 600 .env
@@ -140,6 +159,14 @@ reglas nuevas de firewall, y el TLS lo termina el edge.
 Compose. El túnel crea el CNAME en *proxied*: **no hace falta `Origin CA`, ni modo "Full (strict)", ni
 abrir el 80 al mundo**.
 
+**Hecho el 18-nov-2026**: túnel `winopo-cax11`, id `b2690a74-b65b-4909-9f4b-82ad29b7693c`, *remotely
+managed* (`config_src: cloudflare`), con ingress `app.winopo.es → http://caddy:80` y `http_status:404` de
+reserva. Se creó con la sesión OAuth de `wrangler` (`npx wrangler login`) porque `API_TOKEN_CLOUDFLARE`
+solo tiene `Cloudflare Tunnel: Read`: con él `GET /cfd_tunnel` responde, pero `POST /cfd_tunnel` devuelve
+`10000 Authentication error` y `PUT .../configurations` devuelve `1001 Not authorized`. Alternativas: ese
+mismo `wrangler` logueado, o un token con `Account → Cloudflare Tunnel → Edit` (el permiso `Read` y
+`Zero Trust → Edit` **no** lo incluyen).
+
 Si el token se filtra: rotarlo en el panel y actualizar `.env` (`docker compose up -d cloudflared`).
 No se guarda en git ni se pega en un chat.
 
@@ -151,7 +178,11 @@ Hay dos mitades y las gestiona gente distinta:
 |---|---|---|---|
 | `winopo.es` | AAAA proxied | `100::` | Worker `winopo` (`custom_domain` en `wrangler.jsonc`) |
 | `www.winopo.es` | AAAA proxied | `100::` | Worker `winopo` (`custom_domain` en `wrangler.jsonc`) |
-| `app.winopo.es` | CNAME proxied | `<uuid>.cfargotunnel.com` | este runbook, vía túnel |
+| `app.winopo.es` | CNAME proxied | `b2690a74-b65b-4909-9f4b-82ad29b7693c.cfargotunnel.com` | este runbook, vía túnel |
+
+**Aplicado el 18-nov-2026** con `API_TOKEN_CLOUDFLARE` (`Zone.DNS:Edit` basta para el CNAME). Antes de
+escribirlo se comprobó que el nombre no existía (`NXDOMAIN`, no un 1014): el comodín muerto y los CNAME a
+`winopo.pages.dev` ya se habían borrado, y en la cuenta **no queda ningún proyecto Pages `winopo`**.
 
 El apex y `www` **no se tocan a mano**: los crea Cloudflare al atar el custom domain y los mantiene
 `tools/deploy-landing.sh` (o el workflow «landing»). Si alguien los reapunta al túnel, la web comercial
@@ -192,7 +223,7 @@ caja propia.
 ## 5. Primer despliegue
 
 ```bash
-cd /srv/winopo
+cd /opt/winopo
 infra/scripts/deploy.sh prod
 ```
 
@@ -200,6 +231,10 @@ Cinco pasos, y para en el primero que falle: build de las imágenes (se construy
 no hay registry), rol `winopo_app` sin `BYPASSRLS`, migraciones en orden, arranque y estado. Antes de
 construir comprueba que existe `TUNNEL_TOKEN` y, al terminar, que `/healthz` responde a través de
 `caddy` (el camino real del túnel, porque el puerto no está publicado en el host).
+
+El primer despliegue del 18-nov-2026 se paró en el paso 2: `up -d db` vuelve en cuanto arranca el
+contenedor, no cuando Postgres escucha, y el `psql` del rol moría con `No such file or directory` en el
+socket. El script ya espera con `pg_isready` (hasta 60 s) antes de tocar la base.
 
 El primer build en 2 vCPU es lento (Gradle + `npm ci`) y **comparte CPU con Komanda**, que está sirviendo
 clientes. Se baja la prioridad y se vigila:
@@ -228,7 +263,12 @@ Secretos en *Settings > Secrets and variables > Actions*:
 | `SSH_USER` | `winopo` |
 | `SSH_KEY` | clave privada dedicada a despliegues (ed25519) |
 | `SSH_KNOWN_HOSTS` | `ssh-keyscan -H <IP>` ejecutado desde tu máquina |
-| `DEPLOY_PATH` | `/srv/winopo` |
+| `DEPLOY_PATH` | `/opt/winopo` |
+
+**Estado real (18-nov-2026): ninguno de estos secretos está todavía en el repositorio**, así que el job
+fallaría en «Comprobar secretos». Mientras tanto se despliega a mano por SSH. El usuario `winopo` ya
+existe con su clave (`/home/winopo/.ssh/winopo_deploy`), registrada como *deploy key* de solo lectura y en
+su `authorized_keys`: falta copiar `SSH_KEY`, `SSH_HOST` y `SSH_KNOWN_HOSTS` cuando se quiera automatizar.
 
 Después: *Actions > Desplegar > Run workflow*, con `entorno` y `ref` (rama o etiqueta). El workflow hace
 `git fetch` + `git checkout --detach <ref>`: despliega el commit pedido, no lo que haya en el directorio.
@@ -252,6 +292,11 @@ curl -sSI https://app.winopo.es/login | grep -iE 'strict-transport-security|^ser
 
 Esperado: `LANDING_OK` en el landing (con HSTS, CSP y la redirección de `/login` a `app.winopo.es`),
 CNAME a `cfargotunnel.com` en `app`, `200` en `/healthz`, HSTS presente y `server: cloudflare`.
+
+Medido el 18-nov-2026 tras el primer despliegue: `/` `200` (18 296 b, título «WinOpo · preparación de
+oposiciones»), `/login` `200`, `/healthz` `{"estado":"ok","servicio":"winopo"}`, `winopo.es` `200`
+(35 949 b), `winopo.es/login` `301` a `app.winopo.es/login`, túnel `healthy` con 4 conexiones y `2 571 MiB`
+disponibles en la caja con los seis contenedores arriba.
 
 ```bash
 # En la caja: aislamiento y convivencia
@@ -296,7 +341,8 @@ los registros con `tools/dns-cloudflare.sh --ip <nueva IP>` y se borran los host
 | CI/CD automático en cada push | la **plataforma** no (despliegue manual, a propósito); el **landing** sí, vía workflow «landing» |
 | Alta de preparadores | manual, por `psql` |
 | R2, Stripe, SMTP, IA | variables vacías hasta que existan las cuentas |
-| Proyecto Pages `winopo` | ya no tiene registros en la zona (el DNS está limpio); el proyecto en sí solo se borra en el panel: el token no tiene permiso de Pages |
+| Proyecto Pages `winopo` | **no existe** en la cuenta (comprobado el 18-nov-2026 con `wrangler pages project list`): no hay nada que borrar |
+| Workflow «Desplegar» | sin secretos de SSH: hoy se despliega a mano por SSH como `winopo` (§6) |
 | Límite de tasa / WAF en el edge | no configurado; se puede añadir sobre `winopo.es` sin tocar la caja |
 | `vinopo.es`, aviso legal, precio (D9) | decisiones de negocio, no de infraestructura |
 
@@ -315,3 +361,7 @@ los registros con `tools/dns-cloudflare.sh --ip <nueva IP>` y se borran los host
 | Caddy no resuelve `core`/`web` | `docker compose ps` | proyecto Compose distinto al de la red (`name: winopo`) |
 | Login correcto pero sin acceso | `psql` sobre `membership` | `estado` distinto de `activo` |
 | Komanda lento tras el despliegue | `free -m`, `docker stats` | build sin `nice`, o techos coincidiendo: §8 |
+| `psql: ... No such file or directory` en el primer despliegue | paso 2/5 | Postgres aún no escuchaba: el script ya espera con `pg_isready` |
+| `worker` en «unhealthy» con `worker arrancado` en el log | `docker inspect` | el `HEALTHCHECK` de la imagen sondea 8080 y el perfil `worker` no abre puerto: `healthcheck: disable: true` en el compose |
+| `Host key verification failed` al hacer `git fetch` como `winopo` | `/home/winopo/.ssh/known_hosts` | falta la huella de `github.com`: §2 |
+| `10000 Authentication error` al crear el túnel | `npx wrangler login` | el token del `.env` solo tiene `Cloudflare Tunnel: Read`: §3 |

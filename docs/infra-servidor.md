@@ -102,7 +102,7 @@ Si `free -h` muestra menos de 800 MB disponibles y ya hay swap en uso, el debate
 El landing **no depende de esta caja**: `tools/deploy-landing.sh` (o el workflow «landing» en cada push)
 sube `landing/` al Worker y Cloudflare crea el registro del apex y de `www` (`AAAA 100::` proxied) al atar
 el `custom_domain`. Caddy enruta por nombre de host dentro de la red (`infra/caddy/Caddyfile`), y el túnel
-solo necesita declarar `app.winopo.es` → `HTTP caddy:80`.
+`winopo-cax11` declara `app.winopo.es` → `HTTP caddy:80` (en servicio desde el 18-nov-2026).
 
 En caja dedicada, `app.winopo.es` pasa a registro `A` en gris y certificado de Caddy por HTTP-01, con
 `tools/dns-cloudflare.sh --ip <IP>`. El apex sigue siendo del Worker en los dos casos.

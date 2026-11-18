@@ -28,6 +28,11 @@ Producción vive **en la caja compartida con Komanda** y el tráfico entra por C
 no publica ningún puerto. El porqué y el aislamiento están en
 [`docs/runbooks/alta-servidor-winopo.md`](docs/runbooks/alta-servidor-winopo.md) §0.
 
+**Estado a 18-nov-2026: la plataforma está publicada.** `app.winopo.es` entra por el túnel
+`winopo-cax11` (`b2690a74-b65b-4909-9f4b-82ad29b7693c`) a `/opt/winopo` en la caja, con los seis
+contenedores arriba; verificado desde fuera con `200` en `/`, `/login` y `/healthz`. Los despliegues, por
+ahora, se hacen por SSH a mano: los secretos de SSH del workflow **Desplegar** aún no están cargados.
+
 ## 1. Antes del primer despliegue
 
 ### Servidor
@@ -76,7 +81,7 @@ tools/dns-cloudflare.sh --tunnel --apply    # aplica
 |---|---|---|---|
 | `winopo.es` | AAAA proxied | `100::` | Worker `winopo` (`custom_domain`) |
 | `www.winopo.es` | AAAA proxied | `100::` | Worker `winopo` (`custom_domain`) |
-| `app.winopo.es` | CNAME proxied | `<uuid>.cfargotunnel.com` | la caja, vía túnel |
+| `app.winopo.es` | CNAME proxied | `b2690a74-b65b-4909-9f4b-82ad29b7693c.cfargotunnel.com` | la caja, vía túnel |
 
 El script borra los restos muertos que quedan en la zona (`*.winopo.es` y cualquier CNAME a
 `winopo.pages.dev`, un proyecto que ya no existe y devolvía `error code: 1014`) y no toca el `TXT` del
@@ -87,7 +92,11 @@ Si el túnel no existe en la cuenta, el script sale con **2** sin escribir: un C
 túnel detrás solo convierte el 1014 en un NXDOMAIN. Y con el túnel creado, el DNS no basta: hace falta el
 hostname dentro del túnel apuntando a `HTTP caddy:80`, o `cloudflared` responde 404.
 
-Hostname público a declarar en Zero Trust → Tunnels → `winopo-cax11`: `app.winopo.es` → `HTTP caddy:80`.
+Hostname público ya declarado en Zero Trust → Tunnels → `winopo-cax11`: `app.winopo.es` → `HTTP caddy:80`.
+El túnel es *remotely managed* (`config_src: cloudflare`): el ingress se cambia en el panel o por API, no en
+un fichero dentro de `cloudflared`. Crearlo por API necesita `Account → Cloudflare Tunnel → Edit`, que el
+token actual no tiene (`10000 Authentication error`); se creó con la sesión OAuth de `wrangler` (§3 del
+runbook).
 
 Con **IP propia** el modo es el otro, y deja el registro en gris (Cloudflare no proxifica: Caddy gestiona
 el certificado por HTTP-01; en naranja solo tendría sentido con modo SSL "Full strict" y Origin CA):
@@ -114,11 +123,11 @@ un fallo del DNS.
 
 ## 2. Secretos
 
-El `.env` vive **solo en el servidor** (`/srv/winopo/.env`), con permisos `600`, y nunca entra en git
+El `.env` vive **solo en el servidor** (`/opt/winopo/.env`), con permisos `600`, y nunca entra en git
 (está en `.gitignore`; `.env.example` es la plantilla sin valores).
 
 ```bash
-cd /srv/winopo
+cd /opt/winopo
 cp .env.example .env
 chmod 600 .env
 
@@ -159,9 +168,9 @@ con la contraseña del `.env`.
 
 ```bash
 # 1. Código en el servidor (git, no scp de carpetas sueltas)
-sudo mkdir -p /srv/winopo && sudo chown "$USER" /srv/winopo
-git clone https://github.com/systemavworks/winopo.git /srv/winopo
-cd /srv/winopo
+sudo mkdir -p /opt/winopo && sudo chown "$USER" /opt/winopo
+git clone https://github.com/systemavworks/winopo.git /opt/winopo
+cd /opt/winopo
 
 # 2. Secretos
 cp .env.example .env
@@ -204,7 +213,7 @@ supervisión y se anota en el registro de cambios.
 ## 5. Desplegar cambios
 
 ```bash
-cd /srv/winopo
+cd /opt/winopo
 git pull --ff-only
 git log --oneline -1          # saber qué se está desplegando
 infra/scripts/deploy.sh prod
@@ -230,7 +239,7 @@ no dice que la base responda ni que la RLS esté haciendo su trabajo.
 No hay despliegue azul-verde. Revertir es volver al commit anterior y reconstruir:
 
 ```bash
-cd /srv/winopo
+cd /opt/winopo
 git log --oneline -5
 git checkout <commit-anterior>
 infra/scripts/deploy.sh prod
@@ -305,7 +314,7 @@ make landing     # http://localhost:4000
 ## 7. Staging
 
 ```bash
-cd /srv/winopo
+cd /opt/winopo
 infra/scripts/deploy.sh staging
 ```
 
@@ -339,7 +348,7 @@ servidor. Es lo primero que hay que hacer antes de que haya datos de un preparad
 ## 9. Logs y diagnóstico
 
 ```bash
-cd /srv/winopo
+cd /opt/winopo
 docker compose -f infra/docker-compose.prod.yml ps
 docker compose -f infra/docker-compose.prod.yml logs -f --tail=100 core
 docker compose -f infra/docker-compose.prod.yml logs -f --tail=100 worker
