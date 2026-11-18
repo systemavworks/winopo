@@ -178,6 +178,27 @@ mismo `wrangler` logueado, o un token con `Account → Cloudflare Tunnel → Edi
 Si el token se filtra: rotarlo en el panel y actualizar `.env` (`docker compose up -d cloudflared`).
 No se guarda en git ni se pega en un chat.
 
+Si hay que reinstalar y el token no está a mano, se vuelve a pedir a la API sin tocar el panel: basta
+`Cloudflare Tunnel: Read`, que es lo que sí tiene el token del repositorio. Devuelve una sola cadena de
+240 caracteres que empieza por `eyJ`; si sale un JSON o un mensaje de error, no es el token:
+
+```bash
+set -a; . ./.env; set +a
+curl -sS -H "Authorization: Bearer $API_TOKEN_CLOUDFLARE" \
+  "https://api.cloudflare.com/client/v4/accounts/85acbbc7a2dbb26ec060129fab495c2f/cfd_tunnel/b2690a74-b65b-4909-9f4b-82ad29b7693c/token" \
+  | jq -r '.result' | wc -c          # 241: los 240 caracteres + el salto de línea
+```
+
+En `/opt/winopo/.env` van **solo esas cuatro claves** (`POSTGRES_PASSWORD`, `POSTGRES_APP_PASSWORD`,
+`SESSION_SECRET`, `TUNNEL_TOKEN`): el resto —dominios, `APP_ENV=prod`, `DATABASE_URL`— lo pone el
+`docker-compose.prod.yml`. Ni una credencial de Komanda. Antes de desplegar conviene mirar que el
+fichero no tenga sorpresas (espacios alrededor del `=`, `\r`, claves repetidas o restos de un pegado
+fallido), sin enseñar los valores:
+
+```bash
+sudo awk -F= '{printf "%-22s %d chars\n", $1, length($2)}' /opt/winopo/.env
+```
+
 ## 4. DNS (Cloudflare)
 
 Hay dos mitades y las gestiona gente distinta:
