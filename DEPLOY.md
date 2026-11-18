@@ -258,6 +258,16 @@ En CI lo hace el workflow **landing** (`.github/workflows/landing.yml`) en cada 
 `landing/**` o `wrangler.jsonc`, con el secreto `CLOUDFLARE_API_TOKEN` (y opcionalmente la variable
 `CLOUDFLARE_ACCOUNT_ID`). Sin secreto el job **no falla**: avisa y se salta el despliegue.
 
+Ese secreto ya está configurado en el repositorio. Para crearlo o rotarlo (el token necesita
+**Workers Scripts: Edit** y **Workers Routes: Edit** sobre la zona `winopo.es`; no hace falta `Zone.DNS: Edit`,
+lo pone Cloudflare al crear el `custom_domain`):
+
+```bash
+printf '%s' "$API_TOKEN_CLOUDFLARE" | gh secret set CLOUDFLARE_API_TOKEN   # lee de stdin, no del historial
+gh variable set CLOUDFLARE_ACCOUNT_ID --body '85acbbc7a2dbb26ec060129fab495c2f'
+gh workflow run landing.yml && gh run watch                                # prueba de punta a punta
+```
+
 - `landing/_headers` lleva las cabeceras que antes ponía Caddy: HSTS, `nosniff`, `X-Frame-Options`,
   `Referrer-Policy` y CSP con `script-src 'none'`. El script de publicación comprueba que llegan.
 - `landing/_redirects` manda `/login`, `/app` y `/v1` a `app.winopo.es`, como hacía el `redir` de Caddy.
