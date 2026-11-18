@@ -21,7 +21,8 @@ El script crea una base temporal `winopo_restore_test`, restaura, cuenta filas e
 
 ## Restauración real
 
-1. Avisar y parar `core` y `worker` (`docker compose stop core worker`). Así nadie escribe a mitad.
+1. Avisar y parar `core` y `worker`
+   (`docker compose --env-file .env -f infra/docker-compose.prod.yml stop core worker`). Así nadie escribe a mitad.
 2. `createdb winopo_nuevo` y `pg_restore -d winopo_nuevo`.
 3. Renombrar bases (`alter database ... rename to ...`).
 4. Arrancar `core`; comprobar `/healthz` y un login real.

@@ -189,7 +189,8 @@ curl -fsS https://app.winopo.es/healthz
 La primera vez, Caddy tarda unos segundos en obtener el certificado. Si a los dos minutos no hay TLS:
 
 ```bash
-docker compose -f infra/docker-compose.prod.yml logs caddy | tail -30
+# Siempre con --env-file .env: el .env está en la raíz y el compose en infra/, y Compose no lo busca ahí.
+docker compose --env-file .env -f infra/docker-compose.prod.yml logs caddy | tail -30
 ```
 
 Causas habituales, en orden de frecuencia: DNS aún sin propagar, puerto 80 cerrado (Let's Encrypt lo
@@ -201,7 +202,7 @@ No hay registro público: el primer usuario se crea a mano, y esa es una decisi�
 (el alta de preparadores en v0 es manual para controlar quién entra).
 
 ```bash
-docker compose -f infra/docker-compose.prod.yml exec -T db \
+docker compose --env-file .env -f infra/docker-compose.prod.yml exec -T db \
   psql -U winopo -d winopo -v ON_ERROR_STOP=1
 ```
 
@@ -349,10 +350,10 @@ servidor. Es lo primero que hay que hacer antes de que haya datos de un preparad
 
 ```bash
 cd /opt/winopo
-docker compose -f infra/docker-compose.prod.yml ps
-docker compose -f infra/docker-compose.prod.yml logs -f --tail=100 core
-docker compose -f infra/docker-compose.prod.yml logs -f --tail=100 worker
-docker compose -f infra/docker-compose.prod.yml logs -f --tail=100 caddy
+docker compose --env-file .env -f infra/docker-compose.prod.yml ps
+docker compose --env-file .env -f infra/docker-compose.prod.yml logs -f --tail=100 core
+docker compose --env-file .env -f infra/docker-compose.prod.yml logs -f --tail=100 worker
+docker compose --env-file .env -f infra/docker-compose.prod.yml logs -f --tail=100 caddy
 ```
 
 Qué buscar:

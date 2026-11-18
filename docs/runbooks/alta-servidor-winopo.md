@@ -175,7 +175,8 @@ solo tiene `Cloudflare Tunnel: Read`: con él `GET /cfd_tunnel` responde, pero `
 mismo `wrangler` logueado, o un token con `Account → Cloudflare Tunnel → Edit` (el permiso `Read` y
 `Zero Trust → Edit` **no** lo incluyen).
 
-Si el token se filtra: rotarlo en el panel y actualizar `.env` (`docker compose up -d cloudflared`).
+Si el token se filtra: rotarlo en el panel y actualizar `.env`, y recrear solo el conector
+(`docker compose --env-file .env -f infra/docker-compose.prod.yml up -d cloudflared`).
 No se guarda en git ni se pega en un chat.
 
 Si hay que reinstalar y el token no está a mano, se vuelve a pedir a la API sin tocar el panel: basta
@@ -198,6 +199,11 @@ fallido), sin enseñar los valores:
 ```bash
 sudo awk -F= '{printf "%-22s %d chars\n", $1, length($2)}' /opt/winopo/.env
 ```
+
+Y el detalle que cuesta un rato: el `.env` está en la **raíz** del repositorio y los compose en `infra/`,
+así que `docker compose -f infra/docker-compose.prod.yml …` **no** lo lee (Compose busca el `.env` junto
+al fichero `-f`) y falla con `required variable POSTGRES_PASSWORD is missing a value` aunque el fichero
+esté perfecto. Siempre con `--env-file .env`, que es lo que hace `deploy.sh`.
 
 ## 4. DNS (Cloudflare)
 
@@ -387,7 +393,8 @@ los registros con `tools/dns-cloudflare.sh --ip <nueva IP>` y se borran los host
 | `502` en el túnel con `caddy` sano | hostname público mal declarado | el servicio debe ser `HTTP caddy:80`, no un puerto del host |
 | `cloudflared` en bucle | `logs cloudflared` | `TUNNEL_TOKEN` vacío o revocado |
 | `core` en bucle de reinicio | `logs core` | falta `DATABASE_URL` o `SESSION_SECRET` < 32 caracteres |
-| Caddy no resuelve `core`/`web` | `docker compose ps` | proyecto Compose distinto al de la red (`name: winopo`) |
+| Caddy no resuelve `core`/`web` | `docker compose --env-file .env -f infra/docker-compose.prod.yml ps` | proyecto Compose distinto al de la red (`name: winopo`) |
+| `required variable POSTGRES_PASSWORD is missing a value` con el `.env` relleno | el comando | falta `--env-file .env`: Compose busca el `.env` junto al `-f`, no en la raíz |
 | Login correcto pero sin acceso | `psql` sobre `membership` | `estado` distinto de `activo` |
 | Komanda lento tras el despliegue | `free -m`, `docker stats` | build sin `nice`, o techos coincidiendo: §8 |
 | `psql: ... No such file or directory` en el primer despliegue | paso 2/5 | Postgres aún no escuchaba: el script ya espera con `pg_isready` |
