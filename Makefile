@@ -65,8 +65,17 @@ test:
 > $(GRADLE) test
 
 test-db:
-> @echo "Esquema y RLS: se valida aplicando migraciones sobre base limpia"
+> @echo "Esquema y RLS: se rehace el esquema public y se aplican las migraciones"
+> $(COMPOSE) exec -T db psql -U $${POSTGRES_USER:-winopo} -d $${POSTGRES_DB:-winopo} -v ON_ERROR_STOP=1 \
+>   -c 'drop schema if exists public cascade' -c 'create schema public'
+> $(COMPOSE) exec -T db psql -U $${POSTGRES_USER:-winopo} -d $${POSTGRES_DB:-winopo} -v ON_ERROR_STOP=1 \
+>   < infra/postgres/init.sql
 > @$(MAKE) migrate
+> @for f in tests/db/*.sql; do \
+>   echo "-> $$f"; \
+>   $(COMPOSE) exec -T db psql -U $${POSTGRES_USER:-winopo} -d $${POSTGRES_DB:-winopo} -v ON_ERROR_STOP=1 < $$f || exit 1; \
+> done
+> @echo "Esquema y RLS: OK."
 
 web-dev:
 > cd web && npm run dev

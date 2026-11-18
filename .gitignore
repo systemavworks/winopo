@@ -18,6 +18,9 @@ tsconfig.tsbuildinfo
 .venv/
 __pycache__/
 
+# Salida del compilador de Kotlin en el IDE
+/core/bin/
+
 # Sistema
 .DS_Store
 *.swp

@@ -83,7 +83,11 @@ Nada de microservicios, ni Kubernetes, ni colas gestionadas en v0: un servicio, 
 | `entrega` | Supuesto entregado por el opositor | Fichero o texto |
 | `correccion` | Corrección de una entrega | **`corregido_por`**, `modelo`, `prompt_version` |
 | `correccion_item` | Puntos por apartado | Trazable a `rubrica_item` |
-| `ensayo_tribunal` | Ensayo del oral con informe | **No existe**: `membership_id`, `audio_ref`, `transcripcion`, `informe`, `preparador_id`, `liquidado` (D13/D15) |
+| `ensayo_tribunal` | Ensayo del oral con informe | **Escrito en `0016`** (sin aplicar): `alumno_membership_id`, `evaluador_membership_id`, `especialidad_id`, `tarifa_id`, importes congelados, `audio_ref`, `rubrica`, `acta_pdf`, 8 estados (D15/D24) |
+| `especialidad` | Catálogo de plataforma; única fuente del grupo | **Escrito en `0015`** (sin aplicar): `slug`, `nombre`, `grupo` (`A1`/`A2`/`C1`/`C2`), `activa` (D24) |
+| `tarifa` | Matriz tipo × grupo × modalidad | **Escrito en `0015`** (sin aplicar): `precio_neto_cents`, `pago_evaluador_cents`, vigencia sin solapes, `fuente` obligatoria (D24) |
+| `bolsa_evaluador` | Preparador dado de alta como evaluador | **Escrito en `0016`** (sin aplicar): `membership_id`, `especialidad_id`, `estado`, `max_mes`, `acepta_rubrica` (D24) |
+| `liquidacion_evaluador` | Factura mensual al evaluador | **Especificado en `0017`** (sin DDL): `periodo`, importes en céntimos y `retencion_pct` del día (D24) |
 | `video` | Derivado del tema | `tema_version_id`, `guion_sha256`, `estado` |
 | `job` | Cola de trabajo | `tipo`, `estado`, `intentos`, `ultimo_error` |
 | `consent` | Consentimientos y renuncia al desistimiento | Fecha, IP, texto versionado |

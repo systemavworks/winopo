@@ -1,0 +1,19 @@
+-- 0017_liquidacion_evaluador · liquidación mensual del evaluador
+-- F3.5 · pendiente de implementar (antes 0016; se desplaza por 0016_bolsa_ensayo).
+--
+-- Se crea cuando arranca la fase; el número queda reservado para que el orden no se rompa.
+--
+-- Qué tiene que contener, decidido ya para no redecidirlo después:
+--   * `liquidacion_evaluador`: (evaluador_membership_id, periodo) único, ensayos contados,
+--     importes en céntimos enteros (base_imponible_cents, iva_repercutido_cents,
+--     retencion_irpf_cents, total_a_transferir_cents) y `retencion_pct` copiado el día de
+--     la liquidación: la tasa cambia y una liquidación vieja no se recalcula.
+--   * `ensayo_tribunal.liquidacion_id uuid references liquidacion_evaluador(id)
+--     on delete set null`: si el alumno ejerce supresión (RGPD), la liquidación sigue
+--     cuadrando; el ensayo apunta a ella pero no la sostiene.
+--   * RLS: el evaluador ve la suya (evaluador_membership_id = winopo_membership()); el
+--     staff, las de su tenant. La generación la hace el job y, con FORCE RLS, necesita una
+--     política propia: queda por decidir si corre con membership de staff o con un rol de
+--     proceso. No se resuelve aquí a la ligera.
+--
+-- Fuera del DDL: el 15 % y el IVA de los pagos a evaluadores se confirman con el gestor.

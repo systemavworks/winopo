@@ -415,3 +415,65 @@ falla un cambio de norma, el problema legal es de WinOpo y de nadie más.
 
 **Por qué es el mejor argumento anti-fuga**: es lo más difícil de copiar a mano cada convocatoria y lo que un
 preparador solo no puede mantener con 25 temas y tres boletines.
+
+---
+
+## D24 · La bolsa de ensayos y la matriz de tarifas
+
+**Decidido** (18-nov-2026): el tribunal simulado del plan Máster se escribe en tres migraciones —
+`0015_especialidad_tarifa`, `0016_bolsa_ensayo` y `0017_liquidacion_evaluador` —, cada una con su prueba ejecutable en
+`tests/db/` y ejecutadas contra un PostgreSQL limpio por `make test-db`. La especialidad deja de ser texto libre: es una
+fila del catálogo de plataforma `especialidad`, única fuente del grupo (A1/A2/C1/C2), y el precio sale de una matriz
+`tipo × grupo × modalidad` en `tarifa`. Cinco tablas, doce políticas y dos funciones `SECURITY DEFINER`.
+
+**Fail-closed**: sin tarifa vigente no se vende. `fuente` es `NOT NULL`, así que una tarifa sin documentación (tres
+tarifas reales de preparadores, con fecha) no entra; `tarifa_vigente()` devuelve cero filas antes que inventarse un
+precio. Una tarifa tampoco se edita ni se borra: se cierra con `vigente_hasta` y se abre otra.
+
+**Una sola tarifa vigente por producto**: `exclude using gist (tipo with =, grupo with =, modalidad with =,
+daterange(vigente_desde, vigente_hasta, '[)') with &&)`. Dos precios solapados son un error de la base, no del código
+que los inserta; `btree_gist` entra en 0015 justo por eso.
+
+**Los importes se congelan al comprar**: `ensayo_tribunal` copia `tarifa_id`, `cobrado_neto_cents` y
+`pago_evaluador_cents`, y un trigger impide que cambien después. Subir una tarifa no reescribe lo que ya se cobró ni lo
+que ya se debe al evaluador. Todo en céntimos enteros y **netos de IVA**: el IVA se calcula en el checkout, no se
+guarda. El plan no cobra (`origen = 'plan'` con `cobrado_neto_cents = 0`); una compra siempre deja `stripe_ref`.
+
+**La excepción al aislamiento, y por qué se sostiene**: D18 exige que toda lectura cruzada viva en el ámbito
+`plataforma`, con tablas propias y sin datos de alumnos. El ensayo ciego no puede cumplirlo: el evaluador tiene que
+leer una fila de negocio de otro espacio o no hay tribunal. `ensayo_tribunal` es la única tabla del negocio con una
+política que no filtra por `winopo_tenant()` sino por `evaluador_membership_id = winopo_membership()`: ve los ensayos
+que lleva asignados, ni uno más, y su política de escritura no le deja salir de `asignado`, `celebrado` e `informado`.
+La migración lo dice dentro del propio `create policy` para que nadie lo «arregle».
+
+**Nada de `SECURITY DEFINER` para asignar evaluador.** Con `FORCE ROW LEVEL SECURITY` una función no ve más filas que
+quien la llama, así que asignar es política del staff (`winopo_es_staff()`) y el evaluador solo mueve lo que ya lleva.
+Las dos funciones que sí son `SECURITY DEFINER` no exponen filas: `cerrar_ensayos_vencidos()` devuelve cuántos cerró y
+`evaluadores_activos(uuid)` un entero.
+
+**Por qué el cierre a 72 h es función y no política.** En PostgreSQL, un `UPDATE` aplica además las políticas de
+`SELECT`: una política de `UPDATE` sin identidad de sesión no vería ninguna fila, y darle una de `SELECT` equivalente
+abriría a la aplicación las rúbricas de todos los tenants. El barrido va por función `SECURITY DEFINER` con
+`search_path` fijo, se le quita y se le devuelve el contexto de sesión, y no devuelve ninguna fila.
+
+**`WITH CHECK` explícito en toda política de escritura.** Si falta, PostgreSQL reutiliza el `USING` sobre la fila nueva
+y transiciones legítimas — el evaluador pasando a `informado` — fallan sin decir por qué.
+
+**Pendiente, y no se resuelve escribiendo SQL**:
+
+- el tope del 25 % del neto del ensayo choca con la tarifa de 30 € que maneja el estudio de precios (ronda el 30 %);
+  mientras no se firme cuál de las dos cifras manda, el tope no está en el esquema y lo vigila `tests/db/0015_tarifa.sql`;
+- quién cobra en `modalidad = 'propio'`: hoy `pago_evaluador_cents` es `NULL` porque evalúa el preparador del alumno;
+- la retención y el IVA del pago al evaluador: `0017_liquidacion_evaluador` queda como especificación hasta que el
+  gestor conteste;
+- con qué rol corre el job de liquidación: bajo `FORCE RLS` un proceso sin identidad de sesión no ve ninguna fila, el
+  mismo problema que el cierre a 72 h.
+
+**Asumido**: el catálogo (`especialidad`, `tarifa`) lo escribe el operador aplicando migraciones como superusuario;
+`winopo_app` solo lee, y el `REVOKE` de 0015 es defensa en profundidad sobre el `GRANT` por defecto de
+`infra/postgres/init.sql`. Es la misma consecuencia de D3 y de `0002_identidad`: nadie crea tenants desde la aplicación.
+
+**Descartado**: la especialidad como texto libre —dos espacios escribiendo «Administrativo C1» y «administrativo c1» no
+casan con la tarifa—, el pago al evaluador por Stripe (es un proveedor: necesita factura con retención, no un payout) y
+un rol de servicio con `BYPASSRLS` para el barrido o la liquidación.
+
