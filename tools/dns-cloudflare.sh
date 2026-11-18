@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
-# Registros DNS de winopo.es en Cloudflare. Dos modos:
+# Registros DNS de winopo.es en Cloudflare. El apex y www **no se tocan aquí**: los posee el Worker
+# «winopo» (`wrangler.jsonc` con `custom_domain`) y los mantiene `tools/deploy-landing.sh`. Si este
+# script reapuntara el apex al túnel, se llevaría por delante la web comercial. Solo gestiona
+# app.winopo.es, que es lo único que sigue fuera de Cloudflare.
 #
-#   --tunnel   (el de producción hoy) La entrada es un Cloudflare Tunnel: deja winopo.es,
-#              www.winopo.es y app.winopo.es en CNAME proxied al <id>.cfargotunnel.com del
-#              túnel, que es lo que hace que el tráfico llegue al caddy interno de la caja.
-#              El túnel se busca por nombre (`winopo-cax11`); si el token no puede listar
-#              túneles, pásalo a mano con --tunnel-id. Sin túnel no se toca el DNS: sale
-#              con 2 y dice qué falta, para no dejar la zona a medias.
+#   --tunnel   La plataforma entra por Cloudflare Tunnel: deja app.winopo.es en CNAME proxied al
+#              <id>.cfargotunnel.com del túnel, que es lo que hace que el tráfico llegue al caddy
+#              interno de la caja. El túnel se busca por nombre (`winopo-cax11`); si el token no
+#              puede listar túneles, pásalo a mano con --tunnel-id. Sin túnel no se toca el DNS:
+#              sale con 2 y dice qué falta, para no dejar la zona a medias.
 #
-#   --ip IP    Caja dedicada con IP pública: deja winopo.es y app.winopo.es en A (gris) y
-#              www en CNAME al apex, para que Caddy saque el certificado por HTTP-01.
-#              En naranja habría dos TLS y Cloudflare exigiría un certificado de origen
-#              (Origin CA) o modo "Full (strict)".
+#   --ip IP    Caja dedicada con IP pública: deja app.winopo.es en A (gris), para que Caddy saque
+#              el certificado por HTTP-01. En naranja habría dos TLS y Cloudflare exigiría un
+#              certificado de origen (Origin CA) o modo "Full (strict)".
 #
 # Simula por defecto: enseña qué cambiaría y no toca nada. Con --apply escribe.
 # Idempotente: dos ejecuciones seguidas con el mismo destino no cambian nada la segunda.
@@ -27,6 +28,8 @@
 # Cloudflare Tunnel → Read. Crear el túnel es otra cosa: eso se hace una vez en el panel
 # (o con un token que tenga Tunnel → Edit) y el proyecto de Pages muerto se borra desde
 # el panel, que aquí no hay permiso de Pages.
+# Los registros del apex y de www los crea Cloudflare al atar el custom domain del Worker
+# (Workers Routes:Edit, permiso que usa `wrangler deploy`, no este script).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -146,7 +149,7 @@ o vuelves aquí y los pone este script:
   tools/dns-cloudflare.sh --tunnel --apply
 
 Lo que hay dentro del túnel, si lo prefieres por API:
-  winopo.es / www.winopo.es / app.winopo.es → HTTP  caddy:80
+  app.winopo.es → HTTP  caddy:80
 FIN
     exit 2
   fi
@@ -240,37 +243,35 @@ poner_cname() { # poner_cname NOMBRE DESTINO
   fi
 }
 
-echo "1) Restos de Cloudflare Pages (dan error 1014 y hoy tienen el dominio caído)"
+echo "1) Restos de Cloudflare Pages (dan error 1014)"
 # El comodín se lleva por delante app., staging., mail. y cualquier subdominio futuro.
 # Se borra solo si apunta a pages.dev: si alguien lo reapunta a mano, no se toca.
-# www no entra aquí: en modo --ip se reapunta abajo y en modo --tunnel lo trata el paso 2.
-nombre="*.$DOMINIO"
-tipo=$(tipo_actual "$nombre")
-if [ -n "$tipo" ]; then
-  contenido=$(registros | jq -r --arg n "$nombre" '[.result[] | select(.name==$n)][0].content')
+# El apex y www también se limpian si seguían en pages.dev: el registro bueno lo crea
+# Cloudflare al atar el custom domain del Worker, y aquí no se escribe ninguno.
+for nombre in "*.$DOMINIO" "$DOMINIO" "www.$DOMINIO"; do
+  reg=$(registros | jq -c --arg n "$nombre" \
+    '[.result[] | select(.name==$n and (.type=="A" or .type=="AAAA" or .type=="CNAME"))][0] // empty')
+  [ -n "$reg" ] || continue
+  contenido=$(printf '%s' "$reg" | jq -r '.content')
+  tiporeg=$(printf '%s' "$reg" | jq -r '.type')
   case "$contenido" in
     *pages.dev*)
-      id=$(existente "$nombre" "$tipo")
-      echo "  $nombre: $tipo -> $contenido (muerto) · se borra"
+      id=$(printf '%s' "$reg" | jq -r '.id')
+      echo "  $nombre: $tiporeg -> $contenido (muerto) · se borra"
       mutar "borrar $nombre" DELETE "/zones/$ZID/dns_records/$id" ;;
-    *) echo "  $nombre: $tipo -> $contenido · no es de Pages, se deja como está" ;;
+    *) echo "  $nombre: $tiporeg -> $contenido · no es de Pages, se deja como está" ;;
   esac
-fi
+done
 echo
 
 if [ "$MODO" = "ip" ]; then
-  echo "2) Dominios del producto (infra/caddy/Caddyfile)"
-  poner_a "$DOMINIO"
-  poner_cname "www.$DOMINIO" "$DOMINIO"
+  echo "2) Plataforma: app.$DOMINIO -> $IP"
   poner_a "app.$DOMINIO"
   if [ "$CON_STAGING" -eq 1 ]; then poner_a "staging.$DOMINIO"; fi
 else
-  echo "2) Dominios del producto -> túnel $TUNEL"
-  # El apex como CNAME a cfargotunnel vale porque va proxied: Cloudflare lo achata. Y
-  # `poner_cname` reapunta lo que hubiera en vez de borrar y crear, así que un registro
-  # montado a mano se corrige sin perder el nombre.
-  poner_cname "$DOMINIO" "$DESTINO"
-  poner_cname "www.$DOMINIO" "$DESTINO"
+  echo "2) Plataforma: app.$DOMINIO -> túnel $TUNEL"
+  # Solo app.winopo.es. El apex y www son del Worker «winopo» (custom_domain); reapuntarlos
+  # al túnel dejaría la web comercial sin servir.
   poner_cname "app.$DOMINIO" "$DESTINO"
   if [ "$CON_STAGING" -eq 1 ]; then
     echo "  staging.$DOMINIO: se omite; staging no corre en la caja compartida (publica 80/443)"
@@ -284,17 +285,19 @@ echo
 
 if [ "$MODO" = "tunnel" ]; then
   cat <<'FIN'
-El DNS va por aquí, pero un CNAME al túnel solo sirve si el túnel tiene dentro esos
-hostnames. Eso es configuración del túnel (Zero Trust), no de la zona:
+app.winopo.es va por aquí, pero un CNAME al túnel solo sirve si el túnel tiene dentro ese
+hostname. Eso es configuración del túnel (Zero Trust), no de la zona:
 
-  Tunnels → winopo-cax11 → Public hostname, tres entradas al mismo servicio:
-    winopo.es      → HTTP  caddy:80
-    www.winopo.es  → HTTP  caddy:80
+  Tunnels → winopo-cax11 → Public hostname:
     app.winopo.es  → HTTP  caddy:80
 
   `caddy` resuelve por la red winopo_default: cloudflared y caddy van en el mismo proyecto
   Compose. Si el hostname no está en el túnel, cloudflared contesta 404 aunque el DNS esté
   perfecto.
+
+El apex y www no aparecen aquí a propósito: los sirve el Worker «winopo». Se publican con
+  tools/deploy-landing.sh   (o el workflow «landing» al hacer push a main)
+y su registro lo crea Cloudflare al atar el custom domain (AAAA 100:: proxied).
 
 Y dos cosas que este token no puede hacer y no hacen falta para publicar:
   · crear el túnel (necesita Account → Cloudflare Tunnel → Edit);
@@ -315,8 +318,9 @@ if [ "$MODO" = "tunnel" ]; then
   cat <<'FIN'
 
 Comprobar cuando el túnel esté arriba:
-  dig +short winopo.es @1.1.1.1        # CNAME a <uuid>.cfargotunnel.com (achatado)
-  curl -sI https://winopo.es | head -3  # 200 y `server: cloudflare`
+  dig +short app.winopo.es @1.1.1.1     # CNAME a <uuid>.cfargotunnel.com (achatado)
+  curl -sS -o /dev/null -w '%{http_code}\n' https://app.winopo.es/healthz   # 200
+  curl -sS -o /dev/null -w '%{http_code}\n' https://winopo.es/              # 200 (Worker)
 FIN
 else
   cat <<'FIN'
